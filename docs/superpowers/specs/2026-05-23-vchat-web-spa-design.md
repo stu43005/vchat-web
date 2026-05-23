@@ -439,7 +439,7 @@ not retry (no point retrying a missing file).
 | --- | --- | --- |
 | `/` | `routes/index.tsx` | `{ tab: "live" \| "past" }` default `"live"` |
 | `/channels/$channelId` | `routes/channels.$channelId.tsx` | none |
-| `/videos/$videoId` | `routes/videos.$videoId.tsx` | `{ types?: FilterableType[]; minSig?: number }` where `type FilterableType = Exclude<ChatRow["type"], "raidOutgoing">` (`raidOutgoing` is grouped under `raid` per §5.2; never appears in the URL) |
+| `/videos/$videoId` | `routes/videos.$videoId.tsx` | `{ types?: FilterableType[]; sigRange?: [number, number] }` where `type FilterableType = Exclude<ChatRow["type"], "raidOutgoing">` (`raidOutgoing` is grouped under `raid` per §5.2; never appears in the URL). `sigRange` is a 2-tuple `[min, max]` with `0 <= min <= max <= 7`. |
 | any other | `__root.tsx#notFoundComponent` | n/a |
 
 Unknown search params are dropped silently (zod `.strip()` by default).
@@ -453,8 +453,10 @@ Per-field default semantics:
   `["superChat","superSticker"]` only when the field is `undefined`,
   so `?types=` (explicit empty array, post-decode) keeps the empty
   list semantics described below for `types`.
-- `minSig` (Video page) — `z.number().int().min(0).max(7).optional()`.
-  Component applies default `1` when `undefined`.
+- `sigRange` (Video page) — `z.tuple([z.number().int().min(0).max(7),
+  z.number().int().min(0).max(7)]).refine(([lo, hi]) => lo <= hi).optional()`.
+  Component applies default `[1, 7]` when `undefined`. Invalid tuples
+  (e.g. `[5, 3]`) fail schema validation and the param is dropped.
 
 `__root.tsx` declares `notFoundComponent: () => <NotFound />` which
 renders a centered `Typography` + a `Button` back to `/`. The same
@@ -470,18 +472,20 @@ component is also used for unmatched paths globally.
   - Absent (`undefined`): defaults to `["superChat", "superSticker"]`.
   - Explicit empty list (`[]`): show no rows. The UI renders the
     "No row types selected" empty state (§6.4 #5).
-- `minSig` — integer `0..7`. Only filters `superChat` and `superSticker`
+- `sigRange` — inclusive `[min, max]` integer range, each `0..7`,
+  with `min <= max`. Only filters `superChat` and `superSticker`
   rows; other types are unaffected. A row with no `significance` field
-  is treated as significance `0`.
-  - Absent: defaults to `1`.
+  is treated as significance `0` (and so passes only when `min === 0`).
+  - Absent: defaults to `[1, 7]` (matches the prior single-min default
+    of `1`, with no upper bound).
 
 ### 5.3 URL serialization
 
 Search params use TanStack Router's **default** JSON-string serializer
 (no custom `parseSearch` / `stringifySearch` override). Arrays serialize
 as JSON-encoded strings in the query string:
-`?types=%5B%22superChat%22%2C%22superSticker%22%5D&minSig=1`. URLs are
-not pretty but are fully shareable and round-trip safe.
+`?types=%5B%22superChat%22%2C%22superSticker%22%5D&sigRange=%5B1%2C7%5D`.
+URLs are not pretty but are fully shareable and round-trip safe.
 
 Filter changes call `navigate({ search: ..., replace: true })` so
 back/forward history is not polluted on every chip toggle.
@@ -715,9 +719,13 @@ not a row-type count); it appears only in this summary.
   The `raid` chip controls both `raid` and `raidOutgoing` rows (per
   §5.2). `raidCount` already covers both directions.
 
-- Below the chip row: MUI `Slider` (`min=0`, `max=7`, `step=1`, marks
-  at every integer) labeled
-  `"Min significance (SuperChat / Sticker)"`.
+- Below the chip row: MUI range `Slider` (`min=0`, `max=7`, `step=1`,
+  marks at every integer, `value={sigRange}` as a 2-thumb range)
+  labeled `"Significance range (SuperChat / Sticker)"`. The two
+  thumbs are constrained so `min <= max`; MUI's `disableSwap` is
+  **not** set, so dragging one thumb past the other simply reorders
+  them in the emitted tuple (component normalizes before writing to
+  the URL).
 
 #### 5. ChatList (see §7)
 
@@ -806,11 +814,12 @@ const filtered = useMemo(() => {
     if (row.type === "raidOutgoing") return raidGroup;
     if (!typeSet.has(row.type)) return false;
     if (row.type === "superChat" || row.type === "superSticker") {
-      return (row.significance ?? 0) >= minSig;
+      const sig = row.significance ?? 0;
+      return sig >= sigRange[0] && sig <= sigRange[1];
     }
     return true;
   });
-}, [rows, selectedTypes, minSig]);
+}, [rows, selectedTypes, sigRange]);
 ```
 
 Filter operations on a 50k-row array run in ~5ms on commodity hardware;
@@ -1151,8 +1160,11 @@ After deployment to a non-production S3 bucket pointed at a real
 7. Toggle filter chips; URL `?types=` updates (URL-encoded JSON array
    per §5.3); row list filters correctly; `no` column renumbers from 1
    on every change.
-8. Move the significance slider from 1 to 7; SuperChat/Sticker rows
-   below the threshold disappear; other types are unaffected.
+8. Adjust the significance range slider: setting `[3, 5]` shows only
+   SuperChat/Sticker rows with `significance` in `3..5` inclusive;
+   rows below 3 or above 5 disappear. Setting `[0, 7]` shows all
+   SuperChat/Sticker (including those with no `significance` field).
+   Other row types are unaffected by any range setting.
 9. Deselect all chips. Confirm the list area shows
    `"No row types selected"` and no virtualizer is rendered.
 10. Click a timestamp on a row where `timestamp >= actualStart`. A new
@@ -1189,7 +1201,7 @@ After deployment to a non-production S3 bucket pointed at a real
     component renders ("Not Found — VChat" title) with a Back to Home
     button. CloudFront serves `index.html` per §5.4.
 19. Direct-load a deep URL (e.g.
-    `https://{host}/videos/abc?types=%5B%22superChat%22%5D&minSig=3`)
+    `https://{host}/videos/abc?types=%5B%22superChat%22%5D&sigRange=%5B3%2C5%5D`)
     without going through `/` first. Confirm CloudFront serves
     `index.html` and the SPA bootstraps directly into the video page
     with the correct filter state.
