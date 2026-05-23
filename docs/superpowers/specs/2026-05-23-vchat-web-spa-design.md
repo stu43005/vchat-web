@@ -439,7 +439,7 @@ not retry (no point retrying a missing file).
 | --- | --- | --- |
 | `/` | `routes/index.tsx` | `{ tab: "live" \| "past" }` default `"live"` |
 | `/channels/$channelId` | `routes/channels.$channelId.tsx` | none |
-| `/videos/$videoId` | `routes/videos.$videoId.tsx` | `{ types?: ChatRow["type"][]; minSig?: number }` |
+| `/videos/$videoId` | `routes/videos.$videoId.tsx` | `{ types?: FilterableType[]; minSig?: number }` where `type FilterableType = Exclude<ChatRow["type"], "raidOutgoing">` (`raidOutgoing` is grouped under `raid` per §5.2; never appears in the URL) |
 | any other | `__root.tsx#notFoundComponent` | n/a |
 
 Unknown search params are dropped silently (zod `.strip()` by default).
@@ -447,11 +447,12 @@ Per-field default semantics:
 
 - `tab` (Index page) — `z.enum(["live","past"]).default("live")`.
   Schema-level default; no need to distinguish absence from a value.
-- `types` (Video page) — `z.array(z.enum([...])).optional()`. No
+- `types` (Video page) — `z.array(z.enum([...])).optional()` (the
+  enum is the 9-value `FilterableType` set defined in §5.1). No
   schema-level default. The component applies
   `["superChat","superSticker"]` only when the field is `undefined`,
   so `?types=` (explicit empty array, post-decode) keeps the empty
-  list semantics in §5.2 #1.
+  list semantics described below for `types`.
 - `minSig` (Video page) — `z.number().int().min(0).max(7).optional()`.
   Component applies default `1` when `undefined`.
 
@@ -468,7 +469,7 @@ component is also used for unmatched paths globally.
   directions; there is no separate `raidOutgoing` chip).
   - Absent (`undefined`): defaults to `["superChat", "superSticker"]`.
   - Explicit empty list (`[]`): show no rows. The UI renders the
-    "No row types selected" empty state (§6.4 #4).
+    "No row types selected" empty state (§6.4 #5).
 - `minSig` — integer `0..7`. Only filters `superChat` and `superSticker`
   rows; other types are unaffected. A row with no `significance` field
   is treated as significance `0`.
@@ -686,7 +687,7 @@ not a row-type count); it appears only in this summary.
 #### 5. ChatList (see §7)
 
 If `selectedTypes.length === 0` (user deselected all chips), the list
-area renders centered `Typography color="text.secondary"`:
+area (§6.4 #5) renders centered `Typography color="text.secondary"`:
 `"No row types selected"`. The virtualizer is not mounted.
 
 #### Error / loading states
@@ -1101,11 +1102,17 @@ After deployment to a non-production S3 bucket pointed at a real
    columns match the corresponding values in the legacy HTML's
    currency table (legacy has an extra `symbol` column; ignore that
    one).
-6. Confirm `AggregatesSummary` chip counts (Chat, SC, Sticker, Member,
-   Gift Purchases, Total Gifts, Gifts Received, Milestone, Poll, Raid)
-   match the corresponding row counts a user would see in the legacy
-   HTML when enabling matching filters. Note: SPA `no` column is
-   per-filter index, not equal to legacy HTML's absolute `No.` column.
+6. Confirm `AggregatesSummary` chips in the §6.4 #3 canonical order
+   (Chat, SuperChat, SuperSticker, Member, Gifts Received, Gift
+   Purchases, Total Gifts, Milestone, Poll, Raid). For every chip
+   **except** Total Gifts, the displayed value equals the corresponding
+   row count a user would see in the legacy HTML when enabling matching
+   filters. Total Gifts is not a row count: its value equals the sum of
+   `amount` across all `membershipGiftPurchase` rows in the legacy
+   HTML (which the legacy renders as the `(count: N, total: M)` text
+   on the `membershipGiftPurchase` filter; Total Gifts equals `M`).
+   Note: SPA `no` column is per-filter index, not equal to legacy
+   HTML's absolute `No.` column.
 7. Toggle filter chips; URL `?types=` updates (URL-encoded JSON array
    per §5.3); row list filters correctly; `no` column renumbers from 1
    on every change.
