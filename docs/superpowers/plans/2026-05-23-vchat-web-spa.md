@@ -1288,11 +1288,37 @@ git commit -m "feat: StatusText component for video status display"
 ## Task 12: VideoCard component (`src/components/VideoCard.tsx`)
 
 **Files:**
+
+- Create: `src/lib/createMuiLink.ts` (typed-link wrappers for MUI primitives)
 - Create: `src/components/VideoCard.tsx`
 
 ### Steps
 
-- [ ] **Step 1: Write `src/components/VideoCard.tsx`**
+- [ ] **Step 1: Create `src/lib/createMuiLink.ts`**
+
+TanStack Router's `<Link>` rejects spreading polymorphic `component={Link}`
+with `params` onto MUI's `Box`/`CardActionArea`/`Chip` (the params prop
+is typed as `ParamsReducerFn` which doesn't accept arbitrary string
+maps). The fix is `createLink()` wrappers — one per MUI primitive that
+needs to navigate with params.
+
+```ts
+import { createLink } from "@tanstack/react-router";
+import { Box, CardActionArea, Chip } from "@mui/material";
+
+export const RouterBox = createLink(Box);
+export const RouterCardActionArea = createLink(CardActionArea);
+export const RouterChip = createLink(Chip);
+```
+
+Usage: `<RouterBox to="/channels/$channelId" params={{ channelId }} sx={...}>`
+(no `component={Link}` needed — the wrapper handles it).
+
+`<Button component={Link} to="/">` (used in NotFound and error retry
+buttons) does **not** need a wrapper because root-path navigation
+takes no params and TanStack's typing flows through.
+
+- [ ] **Step 2: Write `src/components/VideoCard.tsx`**
 
 ```tsx
 import {
@@ -1305,7 +1331,6 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-import { Link } from "@tanstack/react-router";
 import type {
   ChannelRef,
   VideoSummary,
@@ -1317,6 +1342,7 @@ import {
   legacyVideoHref,
 } from "../lib/format";
 import { useTimezonePref } from "../lib/settings";
+import { RouterBox, RouterCardActionArea } from "../lib/createMuiLink";
 import { StatusText } from "./StatusText";
 
 interface VideoCardProps {
@@ -1372,8 +1398,7 @@ export function VideoCard({ video, channel, hideChannel = false }: VideoCardProp
     <>
       <CardContent sx={{ pt: 0, pb: 1 }}>
         {!hideChannel && (
-          <Box
-            component={Link}
+          <RouterBox
             to="/channels/$channelId"
             params={{ channelId: channel.id }}
             sx={{
@@ -1388,13 +1413,13 @@ export function VideoCard({ video, channel, hideChannel = false }: VideoCardProp
             <Avatar
               src={channel.avatarUrl}
               alt=""
-              imgProps={{ loading: "lazy", referrerPolicy: "no-referrer" }}
+              slotProps={{ img: { loading: "lazy", referrerPolicy: "no-referrer" } }}
               sx={{ width: 24, height: 24 }}
             />
             <Typography variant="body2" noWrap>
               {channel.name}
             </Typography>
-          </Box>
+          </RouterBox>
         )}
         <Typography variant="caption" color="text.secondary" component="div">
           <StatusText
@@ -1425,8 +1450,6 @@ export function VideoCard({ video, channel, hideChannel = false }: VideoCardProp
     </>
   );
 
-  // Polymorphic `component={Link}` on MUI CardActionArea must appear
-  // inline in JSX (not spread) so TS resolves the override's `to`/`params`.
   return (
     <Card>
       {isLegacy ? (
@@ -1440,14 +1463,13 @@ export function VideoCard({ video, channel, hideChannel = false }: VideoCardProp
           <CardContent sx={{ pb: 1 }}>{titleContent}</CardContent>
         </CardActionArea>
       ) : (
-        <CardActionArea
-          component={Link}
+        <RouterCardActionArea
           to="/videos/$videoId"
           params={{ videoId: video.id }}
         >
           {thumbnailContent}
           <CardContent sx={{ pb: 1 }}>{titleContent}</CardContent>
-        </CardActionArea>
+        </RouterCardActionArea>
       )}
       {bodyAndFooter}
     </Card>
@@ -1455,7 +1477,7 @@ export function VideoCard({ video, channel, hideChannel = false }: VideoCardProp
 }
 ```
 
-- [ ] **Step 2: Verify typecheck + lint**
+- [ ] **Step 3: Verify typecheck + lint**
 
 ```bash
 npm run typecheck && npm run lint
@@ -1465,32 +1487,13 @@ Expected: PASS. (The route tree was seeded in Task 0 step 14 with
 stubs for `/`, `/channels/$channelId`, and `/videos/$videoId`, so the
 `<Link to=...>` route literals resolve correctly here.)
 
-**Note on MUI polymorphic typing with TanStack Router `Link`.** MUI's
-`CardActionArea`, `Chip`, and `Box` accept `component={Link}` and
-forward arbitrary props at runtime, but their `OverridableComponent`
-typing does not always surface TanStack's `to` / `params` as known
-props. If typecheck flags `to` / `params` as unknown, the recommended
-fix is to create a typed-link wrapper in `src/lib/createMuiLink.ts`
-using TanStack Router's `createLink` helper, e.g.:
+Both files together — `createMuiLink.ts` is a prerequisite this task
+ships alongside `VideoCard.tsx`.
 
-```ts
-import { createLink, type LinkComponent } from "@tanstack/react-router";
-import { CardActionArea, Chip } from "@mui/material";
-
-export const RouterCardActionArea: LinkComponent<typeof CardActionArea> =
-  createLink(CardActionArea);
-export const RouterChip: LinkComponent<typeof Chip> = createLink(Chip);
-```
-
-Then use `RouterCardActionArea` / `RouterChip` in place of the
-`component={Link}` pattern. Only introduce this wrapper if typecheck
-actually fails; many MUI+TanStack pairings compile cleanly via
-declaration merging.
-
-- [ ] **Step 3: Commit**
+- [ ] **Step 4: Commit**
 
 ```bash
-git add src/components/VideoCard.tsx
+git add src/lib/createMuiLink.ts src/components/VideoCard.tsx
 git commit -m "feat: VideoCard component with legacy + v2 link branching"
 ```
 
@@ -1529,6 +1532,7 @@ import {
 } from "../lib/settings";
 import type { TimezonePref } from "../lib/format";
 import { useChannelQuery, useVideoMetaQuery } from "../api/queries";
+import { RouterBox } from "../lib/createMuiLink";
 
 type Crumb =
   | { label: string; kind: "home" }
@@ -1606,21 +1610,20 @@ function CrumbLink({ crumb }: { crumb: Crumb }) {
   };
   if (crumb.kind === "home") {
     return (
-      <Box component={Link} to="/" sx={baseSx}>
+      <RouterBox to="/" sx={baseSx}>
         {crumb.label}
-      </Box>
+      </RouterBox>
     );
   }
   if (crumb.kind === "channel") {
     return (
-      <Box
-        component={Link}
+      <RouterBox
         to="/channels/$channelId"
         params={{ channelId: crumb.channelId }}
         sx={baseSx}
       >
         {crumb.label}
-      </Box>
+      </RouterBox>
     );
   }
   return <Box sx={baseSx}>{crumb.label}</Box>;
@@ -2066,7 +2069,7 @@ export function ChannelHeader({ channel, loading }: ChannelHeaderProps) {
       <Avatar
         src={channel.avatarUrl}
         alt=""
-        imgProps={{ loading: "lazy", referrerPolicy: "no-referrer" }}
+        slotProps={{ img: { loading: "lazy", referrerPolicy: "no-referrer" } }}
         sx={{ width: 64, height: 64 }}
       />
       <Typography variant="h4" sx={{ flexGrow: 1, minWidth: 0 }} noWrap>
@@ -2452,7 +2455,7 @@ export function ChatRowBase(props: ChatRowBaseProps) {
           <Avatar
             src={photo}
             alt=""
-            imgProps={{ loading: "lazy", referrerPolicy: "no-referrer" }}
+            slotProps={{ img: { loading: "lazy", referrerPolicy: "no-referrer" } }}
             sx={{ width: 40, height: 40 }}
           />
         ) : null}
@@ -3095,10 +3098,10 @@ git commit -m "feat: ChatList virtualizer with type+sigRange filtering"
 - [ ] **Step 1: Write `src/components/VideoHeader.tsx`**
 
 ```tsx
-import { Avatar, Box, Chip, Stack, Typography } from "@mui/material";
-import { Link } from "@tanstack/react-router";
+import { Avatar, Box, Stack, Typography } from "@mui/material";
 import type { VideoMeta } from "../api/types";
 import { getYouTubeThumbnail, getYouTubeUrl, type TimezonePref } from "../lib/format";
+import { RouterChip } from "../lib/createMuiLink";
 import { StatusText } from "./StatusText";
 
 interface VideoHeaderProps {
@@ -3138,15 +3141,14 @@ export function VideoHeader({ video, timezone }: VideoHeaderProps) {
           {video.title}
         </Typography>
         <Box>
-          <Chip
-            component={Link}
+          <RouterChip
             to="/channels/$channelId"
             params={{ channelId: video.channel.id }}
             clickable
             avatar={
               <Avatar
                 src={video.channel.avatarUrl}
-                imgProps={{ loading: "lazy", referrerPolicy: "no-referrer" }}
+                slotProps={{ img: { loading: "lazy", referrerPolicy: "no-referrer" } }}
               />
             }
             label={video.channel.name}
