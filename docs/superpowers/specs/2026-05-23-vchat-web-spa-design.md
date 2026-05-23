@@ -1021,7 +1021,7 @@ export function formatTimestamp(iso: string, timezone: TimezonePref): string {
 }
 
 export function getYouTubeUrl(videoId: string, t?: number): string {
-  return t != null
+  return t !== undefined
     ? `https://youtu.be/${videoId}?t=${t}`
     : `https://youtu.be/${videoId}`;
 }
