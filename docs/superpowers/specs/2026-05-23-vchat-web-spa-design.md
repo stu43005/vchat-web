@@ -101,7 +101,6 @@ vchat-web/
 │   │   ├── ChannelHeader.tsx
 │   │   ├── VideoHeader.tsx
 │   │   ├── CurrencyTable.tsx
-│   │   ├── AggregatesSummary.tsx
 │   │   ├── FilterChips.tsx
 │   │   ├── ChatList.tsx             # virtualized list
 │   │   └── chat-rows/
@@ -471,7 +470,7 @@ component is also used for unmatched paths globally.
   directions; there is no separate `raidOutgoing` chip).
   - Absent (`undefined`): defaults to `["superChat", "superSticker"]`.
   - Explicit empty list (`[]`): show no rows. The UI renders the
-    "No row types selected" empty state (§6.4 #5).
+    "No row types selected" empty state (§6.4 #4).
 - `sigRange` — inclusive `[min, max]` integer range, each `0..7`,
   with `min <= max`. Only filters `superChat` and `superSticker`
   rows; other types are unaffected. A row with no `significance` field
@@ -673,48 +672,29 @@ The `symbol` column from the legacy HTML is omitted because the upstream
 across all currencies adds complexity for marginal value. The
 `code` column already disambiguates.
 
-#### 3. AggregatesSummary
-
-Single row of MUI `Chip`s (read-only, not toggleable; for display only).
-Each chip is `Chip label="{Label}: {count}"` with counts formatted via
-`toLocaleString()`. One chip per entry in the table below; order is
-the table order. Labels here are the canonical labels also used by
-FilterChips (§6.4 #4) — same field, same label across the page.
-
-| Chip label | source field |
-| --- | --- |
-| Chat | `aggregates.chatCount` |
-| SuperChat | `aggregates.superChatCount` |
-| SuperSticker | `aggregates.superStickerCount` |
-| Member | `aggregates.membershipCount` |
-| Gifts Received | `aggregates.giftCount` |
-| Gift Purchases | `aggregates.giftPurchaseCount` |
-| Total Gifts | `aggregates.totalGiftAmount` |
-| Milestone | `aggregates.milestoneCount` |
-| Poll | `aggregates.pollCount` |
-| Raid | `aggregates.raidCount` |
-
-Note: `Total Gifts` has no FilterChips equivalent (it is a derived sum,
-not a row-type count); it appears only in this summary.
-
-#### 4. FilterChips
+#### 3. FilterChips
 
 - Row of nine toggleable MUI `Chip`s, one per filterable type. Each
   chip is `Chip label="{Label} ({count})"` with `color="primary"`
   when selected, `variant="outlined"` otherwise. Counts come from
   `meta.aggregates.*` per the mapping below:
 
-  | Chip key | UI label | count source |
+  | Chip key | UI label | count format |
   | --- | --- | --- |
   | `chat` | `Chat` | `aggregates.chatCount` |
   | `superChat` | `SuperChat` | `aggregates.superChatCount` |
   | `superSticker` | `SuperSticker` | `aggregates.superStickerCount` |
   | `membership` | `Member` | `aggregates.membershipCount` |
   | `membershipGift` | `Gifts Received` | `aggregates.giftCount` |
-  | `membershipGiftPurchase` | `Gift Purchases` | `aggregates.giftPurchaseCount` |
+  | `membershipGiftPurchase` | `Gift Purchases` | `${aggregates.giftPurchaseCount}, ${aggregates.totalGiftAmount} gifts` |
   | `milestone` | `Milestone` | `aggregates.milestoneCount` |
   | `poll` | `Poll` | `aggregates.pollCount` |
   | `raid` | `Raid` | `aggregates.raidCount` |
+
+  Counts are formatted with `toLocaleString()`. The
+  `membershipGiftPurchase` chip is special-cased to surface
+  `totalGiftAmount` (sum of gift counts across all purchase rows)
+  inline alongside the row count, e.g. `Gift Purchases (12, 80 gifts)`.
 
   The `raid` chip controls both `raid` and `raidOutgoing` rows (per
   §5.2). `raidCount` already covers both directions.
@@ -727,10 +707,10 @@ not a row-type count); it appears only in this summary.
   them in the emitted tuple (component normalizes before writing to
   the URL).
 
-#### 5. ChatList (see §7)
+#### 4. ChatList (see §7)
 
 If `selectedTypes.length === 0` (user deselected all chips), the list
-area (§6.4 #5) renders centered `Typography color="text.secondary"`:
+area (§6.4 #4) renders centered `Typography color="text.secondary"`:
 `"No row types selected"`. The virtualizer is not mounted.
 
 #### Error / loading states
@@ -866,7 +846,7 @@ const virtualizer = useVirtualizer({ ...config });
 
 `--chatlist-height` is the CSS custom property set by the video page:
 the page mounts a `ResizeObserver` on the block containing
-`VideoHeader + CurrencyTable + AggregatesSummary + FilterChips`,
+`VideoHeader + CurrencyTable + FilterChips`,
 measures its rendered height `H`, and writes
 `--chatlist-height: calc(100vh - var(--topbar-h) - ${H}px - var(--chatlist-pad))`
 on the `Container` element. `--chatlist-pad` is a constant defined in
@@ -1146,15 +1126,13 @@ After deployment to a non-production S3 bucket pointed at a real
    columns match the corresponding values in the legacy HTML's
    currency table (legacy has an extra `symbol` column; ignore that
    one).
-6. Confirm `AggregatesSummary` chips in the §6.4 #3 canonical order
-   (Chat, SuperChat, SuperSticker, Member, Gifts Received, Gift
-   Purchases, Total Gifts, Milestone, Poll, Raid). For every chip
-   **except** Total Gifts, the displayed value equals the corresponding
-   row count a user would see in the legacy HTML when enabling matching
-   filters. Total Gifts is not a row count: its value equals the sum of
-   `amount` across all `membershipGiftPurchase` rows in the legacy
-   HTML (which the legacy renders as the `(count: N, total: M)` text
-   on the `membershipGiftPurchase` filter; Total Gifts equals `M`).
+6. Confirm `FilterChips` chip counts (§6.4 #3) match the corresponding
+   row counts in the legacy HTML when enabling matching filters. The
+   `Gift Purchases` chip is special-cased and shows both numbers:
+   `Gift Purchases (N, M gifts)` where `N = giftPurchaseCount` (row
+   count) and `M = totalGiftAmount` (sum of `amount` across those
+   rows). Legacy HTML renders the equivalent as
+   `(count: N, total: M)` on the `membershipGiftPurchase` filter.
    Note: SPA `no` column is per-filter index, not equal to legacy
    HTML's absolute `No.` column.
 7. Toggle filter chips; URL `?types=` updates (URL-encoded JSON array
