@@ -72,7 +72,7 @@ client-rendered UI.
 | UI library | Material UI v6+ (`@mui/material`, `@emotion/react`, `@emotion/styled`, `@mui/icons-material`) |
 | Search-param validation | `zod` |
 | Package manager | npm |
-| Node version | 22 (CI) |
+| Node version | 24 (CI) |
 | Hosting | AWS S3 (root) + CloudFront |
 
 Bootstrap command (one-time, run in the empty repo):
@@ -1032,7 +1032,7 @@ permissions:
 Steps:
 
 1. `actions/checkout@v4`
-2. `actions/setup-node@v4` with `node-version: 22`, `cache: 'npm'`
+2. `actions/setup-node@v4` with `node-version: 24`, `cache: 'npm'`
 3. `npm ci`
 4. `npm run lint`
 5. `npm run typecheck`
