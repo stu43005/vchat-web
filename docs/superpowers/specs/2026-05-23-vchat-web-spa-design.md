@@ -403,12 +403,14 @@ useIndexQuery(): UseQueryResult<IndexData>
   queryFn: () => fetchJson<IndexData>("/index.json")
   staleTime: 60_000
   gcTime: 5 * 60_000
+  retry: (failureCount, error) => !(error instanceof NotFoundError) && failureCount < 3
 
 useChannelQuery(channelId: string): UseQueryResult<ChannelData>
   queryKey: ["channel", channelId]
   queryFn: () => fetchJson<ChannelData>(`/channels/${channelId}.json`)
   staleTime: 60_000
   gcTime: 5 * 60_000
+  retry: (failureCount, error) => !(error instanceof NotFoundError) && failureCount < 3
 
 useVideoMetaQuery(videoId: string): UseQueryResult<VideoMeta>
   queryKey: ["videoMeta", videoId]
@@ -441,9 +443,17 @@ not retry (no point retrying a missing file).
 | any other | `__root.tsx#notFoundComponent` | n/a |
 
 Unknown search params are dropped silently (zod `.strip()` by default).
-Defaults are applied in component code when the optional field is
-`undefined`, not by the zod schema (so `?types=` with the empty-list
-semantics in §5.2 can be distinguished from absence).
+Per-field default semantics:
+
+- `tab` (Index page) — `z.enum(["live","past"]).default("live")`.
+  Schema-level default; no need to distinguish absence from a value.
+- `types` (Video page) — `z.array(z.enum([...])).optional()`. No
+  schema-level default. The component applies
+  `["superChat","superSticker"]` only when the field is `undefined`,
+  so `?types=` (explicit empty array, post-decode) keeps the empty
+  list semantics in §5.2 #1.
+- `minSig` (Video page) — `z.number().int().min(0).max(7).optional()`.
+  Component applies default `1` when `undefined`.
 
 `__root.tsx` declares `notFoundComponent: () => <NotFound />` which
 renders a centered `Typography` + a `Button` back to `/`. The same
@@ -478,24 +488,33 @@ back/forward history is not polluted on every chip toggle.
 ### 5.4 CloudFront SPA rewrite
 
 CloudFront must rewrite 4xx errors on **SPA-eligible** paths to
-`/index.html` with a 200 response. SPA-eligible means: any path that is
-not under `/assets/*`, `/data/*`, or the legacy `/{channelId}/*` HTML
-tree (channel IDs follow YouTube's 24-character `UC...` format).
+`/index.html` with a 200 response, while leaving `/data/*` and
+`/assets/*` 404s untouched (so `fetchJson` in §4.2 can distinguish a
+missing JSON file from a real response).
 
-Recommended CloudFront configuration (out of scope for this repo, but
-documented for the operator):
+This requires per-path-prefix scoping of the custom error response.
+Two equivalent configurations are acceptable; pick one:
 
-- Origin: the S3 bucket.
-- Default behavior: serve files; on 403/404 from origin, return
-  `/index.html` (status 200) — standard SPA pattern.
-- This means a typo'd legacy URL like `/UCxxx/garbage.html` will fall
-  through to the SPA, which renders the global `NotFound` page (§5.1).
-  This is acceptable: a real 404 on a path that exists today won't
-  silently become the SPA, because the file is present.
+**Option A — separate CloudFront cache behaviors (recommended):**
 
-`/assets/*` and `/data/*` files are real and serve directly with no
-rewrite. The CloudFront invalidation in §9.3 explicitly never targets
-`/data/*`.
+- Cache behavior 1: path pattern `/data/*` — no custom error response.
+  Origin 4xx returns to client as 4xx.
+- Cache behavior 2: path pattern `/assets/*` — no custom error response.
+- Default behavior: custom error response `403 → /index.html (200)` and
+  `404 → /index.html (200)` — standard SPA pattern.
+
+**Option B — single behavior with CloudFront Function:**
+
+- One default behavior with no S3-error custom mapping.
+- Attach a CloudFront Function on `viewer-response` that rewrites 403/404
+  to a 200+`/index.html` body **only when** the original request URI
+  does not start with `/data/` or `/assets/`.
+
+Either configuration produces: typo'd `/UCxxx/garbage.html` → SPA's
+`NotFound` (acceptable); `/data/videos/UNKNOWN.meta.json` → real 404 →
+`NotFoundError` → "Archive not yet available" UI. The CloudFront
+invalidation in §9.3 explicitly never targets `/data/*` regardless of
+which option is chosen.
 
 ## 6. Page-by-page UX
 
@@ -619,20 +638,24 @@ across all currencies adds complexity for marginal value. The
 Single row of MUI `Chip`s (read-only, not toggleable; for display only).
 Each chip is `Chip label="{Label}: {count}"` with counts formatted via
 `toLocaleString()`. One chip per entry in the table below; order is
-the table order.
+the table order. Labels here are the canonical labels also used by
+FilterChips (§6.4 #4) — same field, same label across the page.
 
 | Chip label | source field |
 | --- | --- |
 | Chat | `aggregates.chatCount` |
-| SC | `aggregates.superChatCount` |
-| Sticker | `aggregates.superStickerCount` |
+| SuperChat | `aggregates.superChatCount` |
+| SuperSticker | `aggregates.superStickerCount` |
 | Member | `aggregates.membershipCount` |
+| Gifts Received | `aggregates.giftCount` |
 | Gift Purchases | `aggregates.giftPurchaseCount` |
 | Total Gifts | `aggregates.totalGiftAmount` |
-| Gifts Received | `aggregates.giftCount` |
 | Milestone | `aggregates.milestoneCount` |
 | Poll | `aggregates.pollCount` |
 | Raid | `aggregates.raidCount` |
+
+Note: `Total Gifts` has no FilterChips equivalent (it is a derived sum,
+not a row-type count); it appears only in this summary.
 
 #### 4. FilterChips
 
@@ -647,8 +670,8 @@ the table order.
   | `superChat` | `SuperChat` | `aggregates.superChatCount` |
   | `superSticker` | `SuperSticker` | `aggregates.superStickerCount` |
   | `membership` | `Member` | `aggregates.membershipCount` |
-  | `membershipGift` | `Gift Received` | `aggregates.giftCount` |
-  | `membershipGiftPurchase` | `Gift Purchased` | `aggregates.giftPurchaseCount` |
+  | `membershipGift` | `Gifts Received` | `aggregates.giftCount` |
+  | `membershipGiftPurchase` | `Gift Purchases` | `aggregates.giftPurchaseCount` |
   | `milestone` | `Milestone` | `aggregates.milestoneCount` |
   | `poll` | `Poll` | `aggregates.pollCount` |
   | `raid` | `Raid` | `aggregates.raidCount` |
@@ -800,10 +823,14 @@ const virtualizer = useVirtualizer({ ...config });
 the page mounts a `ResizeObserver` on the block containing
 `VideoHeader + CurrencyTable + AggregatesSummary + FilterChips`,
 measures its rendered height `H`, and writes
-`--chatlist-height: calc(100vh - var(--topbar-h) - ${H}px - 16px)` on
-the `Container` element. `--topbar-h` is set once by `TopBar` on mount
-via the same `ResizeObserver` pattern. This avoids hard-coding header
-heights while still giving the virtualizer a stable scroll container.
+`--chatlist-height: calc(100vh - var(--topbar-h) - ${H}px - var(--chatlist-pad))`
+on the `Container` element. `--chatlist-pad` is a constant defined in
+`theme.ts` (default `16px`) representing the desired bottom gap between
+the virtualized list and the viewport edge; it lives in one place so a
+future layout change updates it everywhere. `--topbar-h` is set once by
+`TopBar` on mount via the same `ResizeObserver` pattern. This avoids
+hard-coding header heights while still giving the virtualizer a stable
+scroll container.
 
 ### 7.3 Row components
 
@@ -822,10 +849,12 @@ padding: 8px 12px;
 border-bottom: 1px solid divider;
 ```
 
-For row types that skip the photo + author columns (`poll`, `raid`,
-`raidOutgoing`), the `body` cell takes
-`grid-column: photo / body-end` (i.e. spans `photo`, `author`, and
-`body`) so subsequent rows still align under the same grid.
+All 10 row types render into all 5 grid cells; no cell spans across
+columns. For `poll`, `raid`, and `raidOutgoing` rows (which have no
+chat-author) the `photo` cell renders empty and the `author` cell
+renders the role label per the per-type table below (`"Poll"`,
+`"Raid (incoming)"`, `"Raid (outgoing)"`). This keeps every row
+aligned under the same grid regardless of type.
 
 Per-row content:
 
@@ -841,7 +870,7 @@ Type-specific `body` cell:
 
 | Type | Body |
 | --- | --- |
-| `chat` | `row.message` (with leading green/blue/grey color bar if `isOwner` / `isModerator` / `isVerified` respectively — `borderLeft: 4px solid {color}`) |
+| `chat` | `row.message`, with a leading `borderLeft: 4px solid {color}` chosen by branching on `row.authorType` in this order — `owner` → green, `moderator` → blue, `verified` → grey, anything else → no border. Branching on `authorType` (not the boolean flags) ensures exactly one classification per row. |
 | `superChat` | left badge (`Box` 40px height, `bgcolor={row.color ?? "transparent"}`) + amount text (see below) + message (italic `(wordless superchat)` placeholder when `message` is null) |
 | `superSticker` | left badge + amount text + `<img src={row.image} alt={row.text ?? "sticker"} title={row.text ?? ""}>` |
 | `membership` | green left chip + `"Joined as a member ({row.level ?? row.membership ?? "N/A"})"` |
@@ -1013,7 +1042,9 @@ Steps:
 8. `aws s3 sync dist/ s3://${{ secrets.S3_BUCKET }}/ --delete --exclude "data/*"`
    — `--delete` removes stale SPA assets; `--exclude "data/*"` ensures
    the honeybee-owned subtree is never touched even if a future build
-   accidentally emits files under `data/`.
+   accidentally emits files under `data/`. AWS CLI's `*` wildcard in
+   `--exclude` matches `/` characters, so `data/*` recursively excludes
+   all paths under `data/` regardless of depth.
 9. `aws cloudfront create-invalidation
    --distribution-id ${{ secrets.CF_DIST_ID }}
    --paths "/index.html" "/assets/*"`
