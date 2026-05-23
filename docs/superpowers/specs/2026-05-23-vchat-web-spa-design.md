@@ -116,6 +116,7 @@ vchat-web/
 │   │       └── RaidOutgoingRow.tsx
 │   ├── lib/
 │   │   ├── format.ts                # currency, timestamp, YouTube URL helpers
+│   │   ├── currency.ts              # verbatim copy of honeybee currencyMap
 │   │   ├── jsonl.ts                 # parseJSONL(text): ChatRow[] + warnOnce
 │   │   ├── settings.ts              # theme + timezone hook (localStorage)
 │   │   └── useDocumentTitle.ts      # sets document.title per route
@@ -958,26 +959,42 @@ if (video.actualStart && row.timestamp >= video.actualStart) {
 }
 ```
 
-## 8. Helpers (`src/lib/format.ts`)
+## 8. Helpers (`src/lib/format.ts` + `src/lib/currency.ts`)
+
+`src/lib/currency.ts` holds the currency reference data. It is a
+verbatim copy of honeybee's `src/data/currency.ts` `currencyMap`
+constant (same `CurrencyMap` / `CurrencyMapEntry` types, same ~160
+entries, same `decimal_digits` values). Copying (rather than
+hand-curating a subset) avoids drift: when honeybee adds or corrects
+a currency, the SPA receives the same update by re-copying. The
+implementation Task that imports it must include a brief code-comment
+header noting the source path and the rule "regenerate by copying
+verbatim from honeybee; do not hand-edit entries here".
 
 ```ts
-// Currency code → fraction digits. Subset covering currencies that
-// commonly appear in YouTube SuperChat data; default 2 when unknown.
-const currencyDigits: Record<string, number> = {
-  JPY: 0, KRW: 0, CLP: 0, VND: 0,
-  USD: 2, EUR: 2, GBP: 2, CAD: 2, AUD: 2, HKD: 2, TWD: 2, SGD: 2,
-  THB: 2, PHP: 2, IDR: 2, MXN: 2, BRL: 2, ARS: 2, INR: 2, RUB: 2,
-  PLN: 2, SEK: 2, NOK: 2, DKK: 2, CHF: 2, NZD: 2, ZAR: 2, TRY: 2,
-  CZK: 2, HUF: 2, ILS: 2, MYR: 2, RON: 2, PEN: 2, COP: 2, CRC: 2,
-  // ...extend as needed; default branch below handles the rest
+// src/lib/currency.ts
+export type CurrencyMapEntry = {
+  symbol: string;
+  code: string;
+  symbol_native: string;
+  decimal_digits: number;
+  rounding: number;
 };
+export const currencyMap: Record<string, CurrencyMapEntry> = {
+  /* full verbatim copy of honeybee/src/data/currency.ts currencyMap */
+};
+```
+
+```ts
+// src/lib/format.ts
+import { currencyMap } from "./currency";
 
 export function formatCurrency(
   amount: number,
   currency: string,
   style: "currency" | "decimal" = "currency",
 ): string {
-  const digits = currencyDigits[currency] ?? 2;
+  const digits = currencyMap[currency]?.decimal_digits ?? 2;
   return amount.toLocaleString("en-US", {
     style,
     currency,
