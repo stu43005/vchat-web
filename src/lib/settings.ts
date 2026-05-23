@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import type { TimezonePref } from "./format";
 
 export type ThemePref = "light" | "dark" | "system";
@@ -50,18 +50,23 @@ export function useThemePref(): [ThemePref, (next: ThemePref) => void] {
   return [value, setValue];
 }
 
+const DARK_MQ = "(prefers-color-scheme: dark)";
+
+function subscribePrefersDark(callback: () => void): () => void {
+  const mq = window.matchMedia(DARK_MQ);
+  mq.addEventListener("change", callback);
+  return () => mq.removeEventListener("change", callback);
+}
+
+function getPrefersDark(): boolean {
+  return window.matchMedia(DARK_MQ).matches;
+}
+
 export function useResolvedTheme(): "light" | "dark" {
   const [pref] = useThemePref();
-  const [systemDark, setSystemDark] = useState<boolean>(() =>
-    window.matchMedia("(prefers-color-scheme: dark)").matches,
-  );
-  useEffect(() => {
-    if (pref !== "system") return;
-    const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const handler = (e: MediaQueryListEvent) => setSystemDark(e.matches);
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  }, [pref]);
+  // useSyncExternalStore always reads fresh on every render, so toggling
+  // pref away from "system" and back picks up the current OS theme.
+  const systemDark = useSyncExternalStore(subscribePrefersDark, getPrefersDark);
   if (pref === "light") return "light";
   if (pref === "dark") return "dark";
   return systemDark ? "dark" : "light";

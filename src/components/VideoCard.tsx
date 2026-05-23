@@ -127,8 +127,6 @@ export function VideoCard({ video, channel, hideChannel = false }: VideoCardProp
     </>
   );
 
-  // Polymorphic `component={Link}` on MUI CardActionArea must appear
-  // inline in JSX (not spread) so TS resolves the override's `to`/`params`.
   return (
     <Card>
       {isLegacy ? (
