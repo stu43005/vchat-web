@@ -31,39 +31,55 @@ staging deployment, scheduled outside this plan.
 ## Task 0: Bootstrap project + install dependencies
 
 **Files:**
-- Create: `package.json` (overwritten by `npm create vite`), `vite.config.ts`,
-  `tsconfig.json`, `tsconfig.node.json`, `tsconfig.app.json`,
-  `eslint.config.js`, `index.html`, `.gitignore`, `.env.example`,
-  `public/` (Vite default), `README.md`
+
+- Create (via `npm create vite`): `package.json`, `vite.config.ts`,
+  `tsconfig.json`, `tsconfig.app.json`, `tsconfig.node.json`,
+  `eslint.config.js`, `index.html`, `src/main.tsx`, `src/vite-env.d.ts`
+- Create: `.nvmrc`, `.env.example`, `README.md`,
+  `src/routes/__root.tsx` (minimal stub; fleshed out in Task 15)
+- Modify: `package.json` (engines + scripts), `tsconfig.app.json`,
+  `vite.config.ts`, `.gitignore`, `index.html`
+- Delete: `src/App.tsx`, `src/App.css`, `src/index.css`, `src/assets/`,
+  `public/vite.svg`
 
 ### Steps
 
 - [ ] **Step 1: Scaffold a Vite React-TS project into the empty repo**
 
-The working directory is `/Users/stu43005/Sources/vchat-web` and is an
-empty git repo (single commit history is fine; files only — no other
-config). Run:
+Working directory: `/Users/stu43005/Sources/vchat-web`. Run:
 
 ```bash
 npm create vite@latest . -- --template react-ts
 ```
 
-Answer `y` to "Current directory is not empty. Continue?" if asked.
-The scaffolder creates `package.json`, `vite.config.ts`, `tsconfig.json`
-group, `eslint.config.js`, `index.html`, `src/main.tsx`, `src/App.tsx`,
-`src/App.css`, `src/index.css`, `src/assets/`, `src/vite-env.d.ts`,
-`public/vite.svg`.
+Answer `y` if asked about non-empty directory. The current Vite
+`react-ts` template emits:
+`package.json`, `vite.config.ts`, `tsconfig.json`, `tsconfig.app.json`,
+`tsconfig.node.json`, `eslint.config.js`, `index.html`, `src/main.tsx`,
+`src/App.tsx`, `src/App.css`, `src/index.css`, `src/assets/react.svg`,
+`src/vite-env.d.ts`, `public/vite.svg`. It also installs
+`@vitejs/plugin-react` as a devDependency.
 
-- [ ] **Step 2: Delete scaffolded demo content the spec does not use**
+- [ ] **Step 2: Delete scaffolded demo content**
 
 ```bash
 rm -rf src/App.tsx src/App.css src/index.css src/assets public/vite.svg
 ```
 
-`src/main.tsx` will be fully overwritten in Task 14; for now it can
-keep the scaffolded content (we'll fix it then).
+- [ ] **Step 3: Verify `@vitejs/plugin-react` is installed**
 
-- [ ] **Step 3: Install pinned runtime dependencies**
+```bash
+node -e "require.resolve('@vitejs/plugin-react')"
+```
+
+Expected: prints nothing and exits 0. If it errors with "Cannot find
+module", install it explicitly:
+
+```bash
+npm install -D @vitejs/plugin-react
+```
+
+- [ ] **Step 4: Install pinned runtime dependencies**
 
 ```bash
 npm install \
@@ -77,78 +93,89 @@ npm install \
   zod
 ```
 
-- [ ] **Step 4: Install pinned dev dependencies**
+- [ ] **Step 5: Install pinned dev dependencies**
 
 ```bash
 npm install -D \
   @tanstack/router-plugin \
+  @tanstack/router-cli \
   @tanstack/react-router-devtools \
   @tanstack/react-query-devtools
 ```
 
-- [ ] **Step 5: Overwrite `vite.config.ts`**
+(`@tanstack/router-cli` exposes the `tsr` binary used by the
+`generate-routes` script in Step 11; the Vite plugin alone does not
+provide a standalone generator command.)
 
-Replace the scaffolded contents with the following:
+- [ ] **Step 6: Overwrite `vite.config.ts`**
+
+Replace the scaffolded contents with:
 
 ```ts
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import { TanStackRouterVite } from "@tanstack/router-plugin/vite";
 
-export default defineConfig({
-  plugins: [
-    TanStackRouterVite({ target: "react", autoCodeSplitting: true }),
-    react(),
-  ],
-  base: "/",
-  build: {
-    target: "es2022",
-    outDir: "dist",
-  },
-  server: {
-    proxy: {
-      "/data": {
-        target: process.env.VITE_DATA_PROXY ?? "https://archive.example.com",
-        changeOrigin: true,
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), "");
+  return {
+    plugins: [
+      TanStackRouterVite({ target: "react", autoCodeSplitting: true }),
+      react(),
+    ],
+    base: "/",
+    build: {
+      target: "es2022",
+      outDir: "dist",
+    },
+    server: {
+      proxy: {
+        "/data": {
+          target: env.VITE_DATA_PROXY ?? "https://archive.example.com",
+          changeOrigin: true,
+        },
       },
     },
-  },
+  };
 });
 ```
 
-- [ ] **Step 6: Update `tsconfig.app.json` (or `tsconfig.json` if monolithic)**
+`loadEnv` is required so `.env.local` is picked up by the dev-server
+proxy; bare `process.env` does not see Vite-loaded env vars.
 
-Ensure the TS config contains these compiler options (merge with the
-scaffolded defaults; do not delete the scaffolded `include`/`exclude`):
+- [ ] **Step 7: Edit `tsconfig.app.json` `compilerOptions`**
+
+Open `tsconfig.app.json` (the scaffolded file with `"include": ["src"]`).
+Replace its `compilerOptions` block verbatim with the following, leaving
+`include` and the top-level keys around `compilerOptions` untouched:
 
 ```json
-{
-  "compilerOptions": {
-    "target": "ES2022",
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
-    "jsx": "react-jsx",
-    "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true,
-    "skipLibCheck": true,
-    "esModuleInterop": true,
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "verbatimModuleSyntax": true,
-    "useDefineForClassFields": true,
-    "allowImportingTsExtensions": false,
-    "noEmit": true,
-    "lib": ["ES2022", "DOM", "DOM.Iterable"]
-  }
+"compilerOptions": {
+  "target": "ES2022",
+  "module": "ESNext",
+  "moduleResolution": "Bundler",
+  "jsx": "react-jsx",
+  "strict": true,
+  "noUnusedLocals": true,
+  "noUnusedParameters": true,
+  "noFallthroughCasesInSwitch": true,
+  "skipLibCheck": true,
+  "esModuleInterop": true,
+  "resolveJsonModule": true,
+  "isolatedModules": true,
+  "useDefineForClassFields": true,
+  "allowImportingTsExtensions": false,
+  "noEmit": true,
+  "lib": ["ES2022", "DOM", "DOM.Iterable"]
 }
 ```
 
-- [ ] **Step 7: Append to `.gitignore`**
+Do not set `verbatimModuleSyntax` — the plan's code blocks do not
+universally split `import type`, and the Vite scaffold default omits it.
 
-Add the following lines to the scaffolded `.gitignore` (append; do not
-overwrite):
+- [ ] **Step 8: Append to `.gitignore`**
+
+Append (do not overwrite) these lines:
 
 ```
 .env
@@ -157,9 +184,9 @@ overwrite):
 src/routeTree.gen.ts
 ```
 
-- [ ] **Step 8: Create `.env.example`**
+- [ ] **Step 9: Create `.env.example`**
 
-Write file `.env.example`:
+Write `.env.example`:
 
 ```
 # When running `npm run dev`, requests to /data/* are proxied to this URL.
@@ -172,37 +199,128 @@ VITE_DATA_PROXY=https://archive.example.com
 # VITE_DATA_BASE=https://archive.example.com/data
 ```
 
-- [ ] **Step 9: Add `package.json` scripts**
+- [ ] **Step 10: Create `.nvmrc`**
 
-Edit `package.json` `scripts` section to:
+Write `.nvmrc`:
+
+```
+24
+```
+
+(Pins local Node version to match CI per spec §2.)
+
+- [ ] **Step 11: Edit `package.json` — add `engines` and replace `scripts`**
+
+Edit `package.json`. Add or update these two top-level keys:
 
 ```json
+"engines": {
+  "node": ">=24"
+},
 "scripts": {
   "dev": "vite",
-  "build": "tsc -b && vite build",
+  "generate-routes": "tsr generate",
+  "build": "npm run generate-routes && tsc --noEmit && vite build",
   "preview": "vite preview",
   "lint": "eslint .",
-  "typecheck": "tsc -b --noEmit"
+  "typecheck": "npm run generate-routes && tsc --noEmit"
 }
 ```
 
-(`tsc -b` uses the project-references setup that Vite scaffolds. Use
-`tsc --noEmit` if your scaffold produced a flat tsconfig.)
+`generate-routes` regenerates `src/routeTree.gen.ts` from the
+`src/routes/` tree. Prefixing it onto `typecheck` and `build` ensures
+the generated file is up to date before TS sees it (necessary because
+the file is `.gitignore`'d and not present on a fresh clone).
 
-- [ ] **Step 10: Create empty placeholder `index.html` (keep Vite's default if present)**
+- [ ] **Step 12: Verify scaffolded `index.html` has `<title>VChat</title>`**
 
-Verify the scaffolded `index.html` contains `<title>VChat</title>`.
-If not, edit the `<title>` tag:
-
-```html
-<title>VChat</title>
+```bash
+grep -E "<title>VChat</title>" index.html
 ```
 
-- [ ] **Step 11: Create minimal `README.md`**
+If no match, edit `index.html` and replace the `<title>...</title>`
+line with `<title>VChat</title>`.
 
-Write file `README.md`:
+- [ ] **Step 13: Create stub route files**
 
-```markdown
+Task 15 fleshes out the root, Tasks 16/17/23 flesh out the leaf
+routes. For now, all four stubs are the minimum the generator needs to
+produce a `routeTree.gen.ts` whose route literals already include
+`/`, `/channels/$channelId`, and `/videos/$videoId`. This lets every
+later task that imports `<Link to="/videos/$videoId">` typecheck
+without ordering tricks.
+
+```bash
+mkdir -p src/routes
+```
+
+Write `src/routes/__root.tsx`:
+
+```tsx
+import { Outlet, createRootRoute } from "@tanstack/react-router";
+
+export const Route = createRootRoute({
+  component: () => <Outlet />,
+});
+```
+
+Write `src/routes/index.tsx`:
+
+```tsx
+import { createFileRoute } from "@tanstack/react-router";
+
+export const Route = createFileRoute("/")({
+  component: () => null,
+});
+```
+
+Write `src/routes/channels.$channelId.tsx`:
+
+```tsx
+import { createFileRoute } from "@tanstack/react-router";
+
+export const Route = createFileRoute("/channels/$channelId")({
+  component: () => null,
+});
+```
+
+Write `src/routes/videos.$videoId.tsx`:
+
+```tsx
+import { createFileRoute } from "@tanstack/react-router";
+
+export const Route = createFileRoute("/videos/$videoId")({
+  component: () => null,
+});
+```
+
+- [ ] **Step 14: Generate the initial route tree**
+
+```bash
+npm run generate-routes
+ls -la src/routeTree.gen.ts
+```
+
+Expected: file exists, with `/`, `/channels/$channelId`, and
+`/videos/$videoId` route entries inside. (The generated file stays
+`.gitignore`'d throughout.)
+
+- [ ] **Step 15: Replace `src/main.tsx` with a minimal stub**
+
+The scaffolded `main.tsx` imports `App` and `./index.css` which no
+longer exist. Task 14 will write the real `main.tsx`; for Task 0, a
+no-op stub keeps typecheck green:
+
+```tsx
+const root = document.getElementById("root");
+if (root) root.textContent = "VChat";
+```
+
+- [ ] **Step 16: Create `README.md`**
+
+Write `README.md`:
+
+````markdown
 # vchat-web
 
 React SPA that renders honeybee chat archives. See
@@ -210,8 +328,9 @@ React SPA that renders honeybee chat archives. See
 
 ## Local development
 
-Copy `.env.example` to `.env.local` and set `VITE_DATA_PROXY` to any
-deployment that serves the honeybee-written `/data` tree. Then:
+Requires Node 24 (see `.nvmrc`). Copy `.env.example` to `.env.local`
+and set `VITE_DATA_PROXY` to any deployment that serves the
+honeybee-written `/data` tree. Then:
 
 ```
 npm install
@@ -221,33 +340,50 @@ npm run dev
 ## Scripts
 
 - `npm run dev` — Vite dev server on http://localhost:5173
-- `npm run build` — type-check + production build into `dist/`
+- `npm run generate-routes` — regenerate `src/routeTree.gen.ts`
+- `npm run build` — generate routes + typecheck + production build
 - `npm run preview` — serve the built `dist/` locally
 - `npm run lint` — ESLint
-- `npm run typecheck` — `tsc -b --noEmit`
+- `npm run typecheck` — generate routes + `tsc --noEmit`
 
 ## Deployment
 
-Pushes to `main` trigger `.github/workflows/deploy.yml` which builds and
-syncs to S3 via OIDC, then invalidates CloudFront. Required secrets:
-`AWS_DEPLOY_ROLE_ARN`, `AWS_REGION`, `S3_BUCKET`, `CF_DIST_ID`.
-```
+Pushes to `main` trigger `.github/workflows/deploy.yml` which builds
+and syncs to S3 via OIDC, then invalidates CloudFront. Required
+secrets: `AWS_DEPLOY_ROLE_ARN`, `AWS_REGION`, `S3_BUCKET`,
+`CF_DIST_ID`.
+````
 
-- [ ] **Step 12: Verify build + lint pass with scaffolded content**
+- [ ] **Step 17: Verify typecheck + lint pass**
 
 ```bash
 npm run typecheck && npm run lint
 ```
 
-Expected: both succeed (the scaffolded `main.tsx` is still in place but
-should pass its own lint/typecheck).
+Expected: both succeed.
 
-- [ ] **Step 13: Commit**
+- [ ] **Step 18: Commit**
 
 ```bash
-git add package.json package-lock.json vite.config.ts tsconfig.json tsconfig.app.json tsconfig.node.json eslint.config.js index.html .gitignore .env.example README.md src/main.tsx src/vite-env.d.ts
+git status --short
+```
+
+Stage only the files this task actually created or modified (the exact
+list will match what `git status` shows — typically the items in the
+**Files** section above plus `package-lock.json`):
+
+```bash
+git add package.json package-lock.json vite.config.ts \
+  tsconfig.json tsconfig.app.json tsconfig.node.json \
+  eslint.config.js index.html .gitignore .env.example .nvmrc \
+  README.md src/main.tsx src/vite-env.d.ts \
+  src/routes/__root.tsx src/routes/index.tsx \
+  'src/routes/channels.$channelId.tsx' \
+  'src/routes/videos.$videoId.tsx'
 git commit -m "chore: scaffold Vite React-TS project + pinned deps"
 ```
+
+Do not use `git add -A` or `git add .` (project rule).
 
 ---
 
@@ -258,45 +394,63 @@ git commit -m "chore: scaffold Vite React-TS project + pinned deps"
 
 ### Steps
 
-- [ ] **Step 1: Create `src/lib/currency.ts` as a verbatim copy of honeybee's currencyMap**
+- [ ] **Step 1: Copy honeybee's currency.ts verbatim (do not read into LLM context)**
 
 The source is `/Users/stu43005/Sources/honeybee/src/data/currency.ts`
-(1145 lines). Copy the file verbatim into `src/lib/currency.ts`, with
-the following minimal adjustments:
+(1145 lines — exceeds the 500-line read limit; do not `cat` it). Copy
+mechanically:
 
-1. Change the local `type` declarations to `export type`:
-   - `type CurrencyMap = ...` → `export type CurrencyMap = ...`
-   - `type CurrencyMapEntry = ...` → `export type CurrencyMapEntry = ...`
-2. Prepend this one-line header above the type declarations:
+```bash
+mkdir -p src/lib
+cp /Users/stu43005/Sources/honeybee/src/data/currency.ts src/lib/currency.ts
+```
+
+- [ ] **Step 2: Add `export` to the two type declarations**
+
+Use the Edit tool to change exactly two lines at the top of
+`src/lib/currency.ts`:
+
+- `type CurrencyMap = Record<string, CurrencyMapEntry>;` →
+  `export type CurrencyMap = Record<string, CurrencyMapEntry>;`
+- `type CurrencyMapEntry = {` →
+  `export type CurrencyMapEntry = {`
+
+Do not modify any other line. Do not modify any entry value, key, or
+ordering. Do not trim to a subset.
+
+- [ ] **Step 3: Prepend the source-tracking header comment**
+
+Insert these two lines at the very top of `src/lib/currency.ts`,
+above the existing `type CurrencyMap = ...` line:
 
 ```ts
 // Verbatim copy of honeybee src/data/currency.ts currencyMap.
 // To update: re-copy from honeybee; do not hand-edit entries here.
 ```
 
-Do NOT modify any entry value, key, or ordering. Do NOT trim to a
-subset. The full ~160-entry map is required so unknown SuperChat
-currencies render with correct fraction digits.
-
-Read the source file using:
+- [ ] **Step 4: Sanity-check critical entries via Node**
 
 ```bash
-cat /Users/stu43005/Sources/honeybee/src/data/currency.ts
+node --input-type=module -e "import('./src/lib/currency.ts').then(m=>{const c=m.currencyMap;for(const k of ['JPY','TWD','IDR','COP','USD','BHD'])console.log(k,c[k]?.decimal_digits)})" 2>&1 | tail -10
 ```
 
-Then write the result into `src/lib/currency.ts`.
-
-- [ ] **Step 2: Sanity-check known critical entries**
+If Node's ESM TS loader is not available, use this alternative that
+doesn't execute the file:
 
 ```bash
-grep -E "^  (JPY|TWD|IDR|COP|USD|BHD):" src/lib/currency.ts
+for code in JPY TWD IDR COP USD BHD; do
+  grep -E "^  ${code}: \{" -A 5 src/lib/currency.ts \
+    | grep -E "(decimal_digits|^  ${code}:)" \
+    | head -2
+done
 ```
 
-Expected output includes a block for each of those codes; verify by
-inspection that JPY/TWD/IDR/COP have `decimal_digits: 0`, USD has
-`decimal_digits: 2`, BHD has `decimal_digits: 3`.
+Expected: JPY/TWD/IDR/COP show `decimal_digits: 0`; USD shows
+`decimal_digits: 2`; BHD shows `decimal_digits: 3`. If any value is
+wrong, the upstream `cp` failed or the source has drifted — re-run
+Step 1 and re-verify.
 
-- [ ] **Step 3: Verify typecheck**
+- [ ] **Step 5: Verify typecheck**
 
 ```bash
 npm run typecheck
@@ -304,7 +458,7 @@ npm run typecheck
 
 Expected: PASS.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add src/lib/currency.ts
@@ -762,33 +916,42 @@ export function useIndexQuery(): UseQueryResult<IndexData> {
   });
 }
 
-export function useChannelQuery(channelId: string): UseQueryResult<ChannelData> {
+export function useChannelQuery(
+  channelId: string | undefined,
+): UseQueryResult<ChannelData> {
   return useQuery({
     queryKey: ["channel", channelId],
     queryFn: () => fetchJson<ChannelData>(`/channels/${channelId}.json`),
     staleTime: 60_000,
     gcTime: 5 * 60_000,
     retry: retryOnNon404,
+    enabled: Boolean(channelId),
   });
 }
 
-export function useVideoMetaQuery(videoId: string): UseQueryResult<VideoMeta> {
+export function useVideoMetaQuery(
+  videoId: string | undefined,
+): UseQueryResult<VideoMeta> {
   return useQuery({
     queryKey: ["videoMeta", videoId],
     queryFn: () => fetchJson<VideoMeta>(`/videos/${videoId}.meta.json`),
     staleTime: 5 * 60_000,
     gcTime: 30 * 60_000,
     retry: retryOnNon404,
+    enabled: Boolean(videoId),
   });
 }
 
-export function useVideoRowsQuery(videoId: string): UseQueryResult<ChatRow[]> {
+export function useVideoRowsQuery(
+  videoId: string | undefined,
+): UseQueryResult<ChatRow[]> {
   return useQuery({
     queryKey: ["videoRows", videoId],
     queryFn: () => fetchJsonl<ChatRow>(`/videos/${videoId}.jsonl`),
     staleTime: 5 * 60_000,
     gcTime: 30 * 60_000,
     retry: retryOnNon404,
+    enabled: Boolean(videoId),
   });
 }
 ```
@@ -1205,27 +1368,8 @@ export function VideoCard({ video, channel, hideChannel = false }: VideoCardProp
     </Typography>
   );
 
-  const cardClickProps = isLegacy
-    ? {
-        component: "a" as const,
-        href: legacyVideoHref(video, channel),
-        target: "_blank",
-        rel: "noopener noreferrer",
-      }
-    : {
-        component: Link,
-        to: "/videos/$videoId",
-        params: { videoId: video.id },
-      };
-
-  return (
-    <Card>
-      <CardActionArea {...cardClickProps}>
-        {thumbnailContent}
-        <CardContent sx={{ pb: 1 }}>
-          {titleContent}
-        </CardContent>
-      </CardActionArea>
+  const bodyAndFooter = (
+    <>
       <CardContent sx={{ pt: 0, pb: 1 }}>
         {!hideChannel && (
           <Box
@@ -1240,7 +1384,6 @@ export function VideoCard({ video, channel, hideChannel = false }: VideoCardProp
               color: "inherit",
               mb: 0.5,
             }}
-            onClick={(e: React.MouseEvent) => e.stopPropagation()}
           >
             <Avatar
               src={channel.avatarUrl}
@@ -1279,6 +1422,34 @@ export function VideoCard({ video, channel, hideChannel = false }: VideoCardProp
           <span>Gifts: {video.stats.giftCount.toLocaleString()}</span>
         </Stack>
       </Box>
+    </>
+  );
+
+  // Polymorphic `component={Link}` on MUI CardActionArea must appear
+  // inline in JSX (not spread) so TS resolves the override's `to`/`params`.
+  return (
+    <Card>
+      {isLegacy ? (
+        <CardActionArea
+          component="a"
+          href={legacyVideoHref(video, channel)}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          {thumbnailContent}
+          <CardContent sx={{ pb: 1 }}>{titleContent}</CardContent>
+        </CardActionArea>
+      ) : (
+        <CardActionArea
+          component={Link}
+          to="/videos/$videoId"
+          params={{ videoId: video.id }}
+        >
+          {thumbnailContent}
+          <CardContent sx={{ pb: 1 }}>{titleContent}</CardContent>
+        </CardActionArea>
+      )}
+      {bodyAndFooter}
     </Card>
   );
 }
@@ -1290,11 +1461,9 @@ export function VideoCard({ video, channel, hideChannel = false }: VideoCardProp
 npm run typecheck && npm run lint
 ```
 
-Expected: PASS. (`Link to`/`params` type errors will appear until the
-routes exist — if seen, comment out the channel chip's `to`/`params`
-temporarily, then re-enable after Task 17. For Task 12 alone, prefer
-to skip lint of this file with `// @ts-expect-error route tree not yet generated`
-on the two `to=` lines.)
+Expected: PASS. (The route tree was seeded in Task 0 step 14 with
+stubs for `/`, `/channels/$channelId`, and `/videos/$videoId`, so the
+`<Link to=...>` route literals resolve correctly here.)
 
 - [ ] **Step 3: Commit**
 
@@ -1325,29 +1494,66 @@ import {
   MenuItem,
   Toolbar,
   Typography,
+  useMediaQuery,
+  useTheme,
 } from "@mui/material";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import Brightness4Icon from "@mui/icons-material/Brightness4";
-import { Link, useMatches } from "@tanstack/react-router";
+import { Link, useMatch } from "@tanstack/react-router";
 import {
   useThemePref,
   useTimezonePref,
   type ThemePref,
 } from "../lib/settings";
 import type { TimezonePref } from "../lib/format";
+import { useChannelQuery, useVideoMetaQuery } from "../api/queries";
 
-interface BreadcrumbEntry {
-  label: string;
-  to?: string;
-}
+type Crumb =
+  | { label: string; kind: "home" }
+  | { label: string; kind: "channel"; channelId: string }
+  | { label: string; kind: "video" };
 
-function useBreadcrumbs(): BreadcrumbEntry[] {
-  const matches = useMatches();
-  const crumbs: BreadcrumbEntry[] = [{ label: "Home", to: "/" }];
-  for (const m of matches) {
-    const loaderData = m.loaderData as { breadcrumb?: BreadcrumbEntry } | undefined;
-    if (loaderData?.breadcrumb) crumbs.push(loaderData.breadcrumb);
+function useBreadcrumbs(): Crumb[] {
+  // Loose matches: returns null when the route is not active, so the
+  // hook can call useChannelQuery / useVideoMetaQuery unconditionally
+  // (queries are enabled only when there's an id to fetch).
+  const channelMatch = useMatch({
+    from: "/channels/$channelId",
+    shouldThrow: false,
+  });
+  const videoMatch = useMatch({
+    from: "/videos/$videoId",
+    shouldThrow: false,
+  });
+
+  const channelId = channelMatch?.params.channelId;
+  const videoId = videoMatch?.params.videoId;
+
+  const channelQuery = useChannelQuery(channelId);
+  const videoQuery = useVideoMetaQuery(videoId);
+
+  const crumbs: Crumb[] = [{ label: "Home", kind: "home" }];
+
+  if (channelId) {
+    crumbs.push({
+      label: channelQuery.data?.name ?? "…",
+      kind: "channel",
+      channelId,
+    });
   }
+  if (videoId) {
+    if (videoQuery.data) {
+      crumbs.push({
+        label: videoQuery.data.channel.name,
+        kind: "channel",
+        channelId: videoQuery.data.channel.id,
+      });
+      crumbs.push({ label: videoQuery.data.title, kind: "video" });
+    } else {
+      crumbs.push({ label: "…", kind: "video" });
+    }
+  }
+
   return crumbs;
 }
 
@@ -1365,6 +1571,39 @@ const THEME_LABELS: Record<ThemePref, string> = {
   system: "System",
 };
 
+function CrumbLink({ crumb }: { crumb: Crumb }) {
+  const baseSx = {
+    color: "inherit",
+    textDecoration: "none",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    maxWidth: 320,
+    display: "inline-block",
+    verticalAlign: "bottom",
+  };
+  if (crumb.kind === "home") {
+    return (
+      <Box component={Link} to="/" sx={baseSx}>
+        {crumb.label}
+      </Box>
+    );
+  }
+  if (crumb.kind === "channel") {
+    return (
+      <Box
+        component={Link}
+        to="/channels/$channelId"
+        params={{ channelId: crumb.channelId }}
+        sx={baseSx}
+      >
+        {crumb.label}
+      </Box>
+    );
+  }
+  return <Box sx={baseSx}>{crumb.label}</Box>;
+}
+
 export function TopBar() {
   const appBarRef = useRef<HTMLDivElement>(null);
   const [timezone, setTimezone] = useTimezonePref();
@@ -1372,6 +1611,8 @@ export function TopBar() {
   const [tzAnchor, setTzAnchor] = useState<HTMLElement | null>(null);
   const [themeAnchor, setThemeAnchor] = useState<HTMLElement | null>(null);
   const crumbs = useBreadcrumbs();
+  const muiTheme = useTheme();
+  const isMobile = useMediaQuery(muiTheme.breakpoints.down("sm"));
 
   useEffect(() => {
     const el = appBarRef.current;
@@ -1388,6 +1629,8 @@ export function TopBar() {
     return () => obs.disconnect();
   }, []);
 
+  const visibleCrumbs = isMobile ? [crumbs[crumbs.length - 1]] : crumbs;
+
   return (
     <AppBar ref={appBarRef} position="sticky" color="default" elevation={1}>
       <Toolbar sx={{ gap: 2 }}>
@@ -1400,34 +1643,9 @@ export function TopBar() {
           VChat
         </Typography>
         <Breadcrumbs sx={{ flexGrow: 1, minWidth: 0 }} maxItems={4}>
-          {crumbs.map((c, i) =>
-            c.to ? (
-              <Box
-                key={i}
-                component={Link}
-                to={c.to}
-                sx={{
-                  color: "inherit",
-                  textDecoration: "none",
-                  "&:hover": { textDecoration: "underline" },
-                }}
-              >
-                {c.label}
-              </Box>
-            ) : (
-              <Box
-                key={i}
-                sx={{
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  maxWidth: 320,
-                }}
-              >
-                {c.label}
-              </Box>
-            ),
-          )}
+          {visibleCrumbs.map((c, i) => (
+            <CrumbLink key={i} crumb={c} />
+          ))}
         </Breadcrumbs>
         <IconButton
           onClick={(e: MouseEvent<HTMLElement>) => setTzAnchor(e.currentTarget)}
@@ -1547,13 +1765,16 @@ createRoot(document.getElementById("root")!).render(
 );
 ```
 
-- [ ] **Step 2: Note: `routeTree.gen.ts` import**
+- [ ] **Step 2: Verify typecheck + lint**
 
-The file does not exist yet. It is generated by
-`@tanstack/router-plugin/vite` at dev/build time when a `src/routes/`
-tree exists. Tasks 15–17 + 23 create the routes; the generator will
-emit `src/routeTree.gen.ts` automatically. For now, the typecheck will
-fail; we will validate at the end of Task 15 once the root route exists.
+`src/routeTree.gen.ts` was generated in Task 0 step 14 (against stub
+routes), so the `import { routeTree } from "./routeTree.gen"` resolves.
+
+```bash
+npm run typecheck && npm run lint
+```
+
+Expected: PASS.
 
 - [ ] **Step 3: Commit**
 
@@ -1567,11 +1788,15 @@ git commit -m "feat: main.tsx wires QueryClient + Router + ThemeProvider"
 ## Task 15: Root route (`src/routes/__root.tsx`)
 
 **Files:**
-- Create: `src/routes/__root.tsx`
+
+- Modify: `src/routes/__root.tsx` (replaces the Task 0 stub)
 
 ### Steps
 
-- [ ] **Step 1: Write `src/routes/__root.tsx`**
+- [ ] **Step 1: Overwrite `src/routes/__root.tsx`**
+
+Replace the Task 0 stub (which was a no-op `<Outlet />`) with the real
+layout including TopBar, NotFound handler, and dev tools:
 
 ```tsx
 import { Outlet, createRootRoute } from "@tanstack/react-router";
@@ -1617,33 +1842,17 @@ function RootLayout() {
 }
 ```
 
-- [ ] **Step 2: Trigger route tree generation by running dev once**
+- [ ] **Step 2: Verify typecheck + lint**
 
 ```bash
-npm run dev
+npm run typecheck && npm run lint
 ```
 
-Wait until the terminal prints "VITE v… ready". This triggers
-`@tanstack/router-plugin/vite` to write `src/routeTree.gen.ts`.
-Then press `q` to stop the dev server. Confirm:
+`npm run typecheck` re-runs `npm run generate-routes` first per Task 0
+step 11, so the regenerated `routeTree.gen.ts` reflects the new root
+component. Expected: PASS.
 
-```bash
-ls -la src/routeTree.gen.ts
-```
-
-Expected: file exists.
-
-- [ ] **Step 3: Verify typecheck**
-
-```bash
-npm run typecheck
-```
-
-Expected: PASS (`main.tsx`'s `./routeTree.gen` import now resolves).
-If the Index route does not yet exist the build may still complain;
-proceed to Task 16.
-
-- [ ] **Step 4: Commit**
+- [ ] **Step 3: Commit**
 
 ```bash
 git add src/routes/__root.tsx
@@ -1787,7 +1996,7 @@ npm run dev
 Visit `http://localhost:5173/`. If `VITE_DATA_PROXY` is unset or
 unreachable, expect the error Alert. With a valid proxy, expect the
 Live tab to render cards. Toggle the Past tab; verify URL shows
-`?tab=%22past%22`. Press `q` to stop dev server.
+`?tab=%22past%22`. Press Ctrl+C to stop dev server.
 
 - [ ] **Step 4: Commit**
 
@@ -1959,7 +2168,7 @@ npm run dev
 ```
 
 Visit `http://localhost:5173/channels/UCxxx` with a real channel id
-from your proxy. Confirm header + grid render. Press `q` to stop.
+from your proxy. Confirm header + grid render. Press Ctrl+C to stop.
 
 - [ ] **Step 5: Commit**
 
@@ -2238,20 +2447,20 @@ export function ChatRowBase(props: ChatRowBaseProps) {
 - [ ] **Step 2: Write `src/components/chat-rows/TimestampLink.tsx`**
 
 ```tsx
-import type { VideoMeta } from "../../api/types";
+import type { ChatRow, VideoMeta } from "../../api/types";
 import { formatTimestamp, getYouTubeUrl, type TimezonePref } from "../../lib/format";
 
 interface TimestampLinkProps {
-  timestamp: string;
+  row: ChatRow;
   video: VideoMeta;
   timezone: TimezonePref;
 }
 
-export function TimestampLink({ timestamp, video, timezone }: TimestampLinkProps) {
-  const display = formatTimestamp(timestamp, timezone);
-  if (video.actualStart && timestamp >= video.actualStart) {
+export function TimestampLink({ row, video, timezone }: TimestampLinkProps) {
+  const display = formatTimestamp(row.timestamp, timezone);
+  if (video.actualStart && row.timestamp >= video.actualStart) {
     const t = Math.floor(
-      (Date.parse(timestamp) - Date.parse(video.actualStart)) / 1000,
+      (Date.parse(row.timestamp) - Date.parse(video.actualStart)) / 1000,
     );
     return (
       <a
@@ -2294,7 +2503,7 @@ export function ChatRow({ row, no, video, timezone }: Props) {
   return (
     <ChatRowBase
       no={no}
-      timestamp={<TimestampLink timestamp={row.timestamp} video={video} timezone={timezone} />}
+      timestamp={<TimestampLink row={row} video={video} timezone={timezone} />}
       photo={row.authorPhoto}
       author={row.authorName ?? ""}
       body={row.message}
@@ -2329,7 +2538,7 @@ export function SuperChatRow({ row, no, video, timezone }: Props) {
   return (
     <ChatRowBase
       no={no}
-      timestamp={<TimestampLink timestamp={row.timestamp} video={video} timezone={timezone} />}
+      timestamp={<TimestampLink row={row} video={video} timezone={timezone} />}
       photo={row.authorPhoto}
       author={row.authorName ?? ""}
       body={
@@ -2385,7 +2594,7 @@ export function SuperStickerRow({ row, no, video, timezone }: Props) {
   return (
     <ChatRowBase
       no={no}
-      timestamp={<TimestampLink timestamp={row.timestamp} video={video} timezone={timezone} />}
+      timestamp={<TimestampLink row={row} video={video} timezone={timezone} />}
       photo={row.authorPhoto}
       author={row.authorName ?? ""}
       body={
@@ -2439,7 +2648,7 @@ export function MembershipRow({ row, no, video, timezone }: Props) {
   return (
     <ChatRowBase
       no={no}
-      timestamp={<TimestampLink timestamp={row.timestamp} video={video} timezone={timezone} />}
+      timestamp={<TimestampLink row={row} video={video} timezone={timezone} />}
       photo={row.authorPhoto}
       author={row.authorName ?? ""}
       body={
@@ -2472,7 +2681,7 @@ export function MembershipGiftRow({ row, no, video, timezone }: Props) {
   return (
     <ChatRowBase
       no={no}
-      timestamp={<TimestampLink timestamp={row.timestamp} video={video} timezone={timezone} />}
+      timestamp={<TimestampLink row={row} video={video} timezone={timezone} />}
       photo={row.authorPhoto}
       author={row.authorName ?? ""}
       body={
@@ -2505,7 +2714,7 @@ export function MembershipGiftPurchaseRow({ row, no, video, timezone }: Props) {
   return (
     <ChatRowBase
       no={no}
-      timestamp={<TimestampLink timestamp={row.timestamp} video={video} timezone={timezone} />}
+      timestamp={<TimestampLink row={row} video={video} timezone={timezone} />}
       photo={row.authorPhoto}
       author={row.authorName ?? ""}
       body={
@@ -2538,7 +2747,7 @@ export function MilestoneRow({ row, no, video, timezone }: Props) {
   return (
     <ChatRowBase
       no={no}
-      timestamp={<TimestampLink timestamp={row.timestamp} video={video} timezone={timezone} />}
+      timestamp={<TimestampLink row={row} video={video} timezone={timezone} />}
       photo={row.authorPhoto}
       author={row.authorName ?? ""}
       body={
@@ -2577,7 +2786,7 @@ export function PollRow({ row, no, video, timezone }: Props) {
   return (
     <ChatRowBase
       no={no}
-      timestamp={<TimestampLink timestamp={row.timestamp} video={video} timezone={timezone} />}
+      timestamp={<TimestampLink row={row} video={video} timezone={timezone} />}
       photo={null}
       author="Poll"
       body={
@@ -2617,7 +2826,7 @@ export function RaidRow({ row, no, video, timezone }: Props) {
   return (
     <ChatRowBase
       no={no}
-      timestamp={<TimestampLink timestamp={row.timestamp} video={video} timezone={timezone} />}
+      timestamp={<TimestampLink row={row} video={video} timezone={timezone} />}
       photo={row.sourcePhoto ?? null}
       author="Raid (incoming)"
       body={`${row.sourceName} and their viewers just joined. Say hello!`}
@@ -2645,7 +2854,7 @@ export function RaidOutgoingRow({ row, no, video, timezone }: Props) {
   return (
     <ChatRowBase
       no={no}
-      timestamp={<TimestampLink timestamp={row.timestamp} video={video} timezone={timezone} />}
+      timestamp={<TimestampLink row={row} video={video} timezone={timezone} />}
       photo={row.originPhoto ?? null}
       author="Raid (outgoing)"
       body={`Sending you to ${row.originName ?? ""}`}
@@ -3040,16 +3249,8 @@ function VideoPage() {
     return () => obs.disconnect();
   }, [meta.data]);
 
-  if (meta.isPending) {
-    return (
-      <Container sx={{ py: 2 }}>
-        <Skeleton variant="rectangular" height={160} sx={{ mb: 2 }} />
-        <Skeleton width={400} height={32} sx={{ mb: 2 }} />
-        <Skeleton variant="rectangular" height={80} sx={{ mb: 2 }} />
-      </Container>
-    );
-  }
-
+  // Meta error takes precedence (so a 404 surfaces "Archive not yet
+  // available" immediately rather than after a skeleton flash).
   if (meta.isError) {
     if (meta.error instanceof NotFoundError) {
       return (
@@ -3076,6 +3277,21 @@ function VideoPage() {
         >
           Failed to load video.
         </Alert>
+      </Container>
+    );
+  }
+
+  // Spec §6.4: "Either meta or rows loading: full-page Skeleton block".
+  if (meta.isPending || rows.isPending) {
+    return (
+      <Container sx={{ py: 2 }}>
+        <Skeleton variant="rectangular" height={160} sx={{ mb: 2 }} />
+        <Skeleton width={400} height={32} sx={{ mb: 2 }} />
+        <Skeleton variant="rectangular" height={80} sx={{ mb: 2 }} />
+        <Skeleton variant="rectangular" height={40} sx={{ mb: 1 }} />
+        {Array.from({ length: 10 }).map((_, i) => (
+          <Skeleton key={i} variant="rectangular" height={56} sx={{ mb: 0.5 }} />
+        ))}
       </Container>
     );
   }
@@ -3124,11 +3340,7 @@ function VideoPage() {
           }
         />
       </Box>
-      {rows.isPending ? (
-        <Box sx={{ py: 4, textAlign: "center" }}>
-          <Typography color="text.secondary">Loading chat…</Typography>
-        </Box>
-      ) : rows.isError ? (
+      {rows.isError ? (
         rows.error instanceof NotFoundError ? (
           <Box sx={{ py: 4, textAlign: "center" }}>
             <Typography color="text.secondary">
@@ -3180,7 +3392,7 @@ npm run dev
 Visit `http://localhost:5173/videos/{realVideoId}` with a v2-archived
 video. Confirm header, currency table, filter chips, and chat list
 render. Toggle chips; URL updates. Drag the slider; rows filter.
-Resize the window; the chat list scroll area resizes. Press `q` to stop.
+Resize the window; the chat list scroll area resizes. Press Ctrl+C to stop.
 
 - [ ] **Step 4: Commit**
 
@@ -3268,16 +3480,21 @@ git commit -m "ci: GitHub Actions deploy to S3 via OIDC + CloudFront invalidatio
 
 ### Steps
 
-- [ ] **Step 1: Full clean build**
+- [ ] **Step 1: Full clean build (mirrors CI)**
 
 ```bash
-rm -rf dist src/routeTree.gen.ts node_modules/.cache
-npm run typecheck
+rm -rf dist node_modules src/routeTree.gen.ts
+npm ci
 npm run lint
+npm run typecheck
 npm run build
 ```
 
-Expected: all three pass. `dist/` exists with `index.html`, `assets/`,
+The order (lint → typecheck → build) matches the CI workflow in Task
+24 so first-failure surface is identical. `npm ci` ensures lockfile
+drift surfaces here rather than in CI.
+
+Expected: all four pass. `dist/` exists with `index.html`, `assets/`,
 and no `data/` directory.
 
 - [ ] **Step 2: Preview the built SPA against a real data source**
@@ -3287,20 +3504,25 @@ VITE_DATA_PROXY=https://your-staging.example.com npm run preview
 ```
 
 Visit `http://localhost:4173/`. Walk through verification §10 steps
-1–4, 7–9, 12–13 manually (the rest require a real S3+CloudFront
-deployment). Verify no console errors other than expected `[vchat]`
+1–4, 7–9, 12–13, 15–17 manually (these are testable against a remote
+data proxy without needing the production S3+CloudFront). The
+remaining §10 steps (5, 6, 10, 11, 14, 18–22) require a real
+S3+CloudFront deployment and are tracked in "Out of plan / out of
+scope" below. Verify no console errors other than expected `[vchat]`
 warnings.
 
-- [ ] **Step 3: Commit any incidental cleanups**
+- [ ] **Step 3 (optional): Commit incidental cleanups**
 
-If any final lint/format fixes are needed, commit them:
+Only if Step 1 surfaced any lint or format fix that an earlier task
+missed, commit them. Stage files by exact path — do not use
+`git add -A` or `git add .` (project rule). For example:
 
 ```bash
-git add -A
-git commit -m "chore: post-integration cleanup"
+git add src/path/to/file.ts
+git commit -m "chore: post-integration lint fix"
 ```
 
-Otherwise, skip the commit.
+If no fixes were needed, skip this step.
 
 ---
 
@@ -3310,12 +3532,13 @@ The following items are explicitly **not** part of this plan and will
 not be executed:
 
 - AWS infrastructure (S3 bucket creation, CloudFront distribution +
-  spa-rewrite function, OIDC trust policy). Operator setup is
-  documented in spec §5.4 and §9.3.
+  spa-rewrite function per spec §5.4, OIDC trust policy). Operator
+  setup is documented in spec §5.4 and §9.3.
 - Provisioning `AWS_DEPLOY_ROLE_ARN`, `AWS_REGION`, `S3_BUCKET`,
   `CF_DIST_ID` GitHub secrets.
-- Full §10 verification on a real S3+CloudFront deployment (steps 4,
-  5, 6, 10, 11, 14–22). This is the post-merge acceptance gate, run
-  by the operator after first deploy.
+- §10 verification steps that require a real S3+CloudFront deployment
+  (5, 6, 10, 11, 14, 18–22). This is the post-merge acceptance gate,
+  run by the operator after first deploy. The remaining steps
+  (1–4, 7–9, 12–13, 15–17) are run locally in Task 25 Step 2.
 - Web Worker JSONL parser (see spec §1 out-of-scope item).
 - Unit tests (see spec §11).
