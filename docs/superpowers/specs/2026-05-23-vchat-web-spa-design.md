@@ -488,34 +488,69 @@ back/forward history is not polluted on every chip toggle.
 
 ### 5.4 CloudFront SPA rewrite
 
-CloudFront must rewrite 4xx errors on **SPA-eligible** paths to
-`/index.html` with a 200 response, while leaving `/data/*` and
-`/assets/*` 404s untouched (so `fetchJson` in §4.2 can distinguish a
-missing JSON file from a real response).
+CloudFront must rewrite requests for SPA paths to `/index.html` so the
+client-side router can handle them, while leaving `/data/*`,
+`/assets/*`, and any legacy file requests (paths with a `.` in the
+last segment) untouched — so `fetchJson` in §4.2 can distinguish a
+missing JSON file from a real response, and legacy HTML files keep
+serving directly.
 
-This requires per-path-prefix scoping of the custom error response.
-Two equivalent configurations are acceptable; pick one:
+AWS's distribution-level **Custom error responses** apply to all
+behaviors and cannot be scoped per-path-prefix; therefore the
+"separate cache behavior" approach does not work for selectively
+suppressing the SPA rewrite on `/data/*`. The supported approach is
+a **CloudFront Function on `viewer-request`** that performs the rewrite
+selectively in JavaScript.
 
-**Option A — separate CloudFront cache behaviors (recommended):**
+**Setup (one-time, by the operator, outside this repo):**
 
-- Cache behavior 1: path pattern `/data/*` — no custom error response.
-  Origin 4xx returns to client as 4xx.
-- Cache behavior 2: path pattern `/assets/*` — no custom error response.
-- Default behavior: custom error response `403 → /index.html (200)` and
-  `404 → /index.html (200)` — standard SPA pattern.
+1. CloudFront → Functions → Create function:
+   - Name: `spa-rewrite`
+   - Runtime: `cloudfront-js-2.0`
+   - Code:
 
-**Option B — single behavior with CloudFront Function:**
+     ```js
+     function handler(event) {
+       var request = event.request;
+       var uri = request.uri;
 
-- One default behavior with no S3-error custom mapping.
-- Attach a CloudFront Function on `viewer-response` that rewrites 403/404
-  to a 200+`/index.html` body **only when** the original request URI
-  does not start with `/data/` or `/assets/`.
+       // Pass through real file paths: SPA assets, honeybee data,
+       // and any URI whose last segment contains a "." (legacy
+       // /{channelId}/{date}_{id}.html and /{channelId}/index.html).
+       if (uri.startsWith('/data/') || uri.startsWith('/assets/')) {
+         return request;
+       }
+       var lastSegment = uri.substring(uri.lastIndexOf('/') + 1);
+       if (lastSegment.indexOf('.') !== -1) {
+         return request;
+       }
 
-Either configuration produces: typo'd `/UCxxx/garbage.html` → SPA's
-`NotFound` (acceptable); `/data/videos/UNKNOWN.meta.json` → real 404 →
-`NotFoundError` → "Archive not yet available" UI. The CloudFront
-invalidation in §9.3 explicitly never targets `/data/*` regardless of
-which option is chosen.
+       // Everything else is an SPA route (including unknown paths
+       // that should render the NotFound page). Rewrite to index.html.
+       request.uri = '/index.html';
+       return request;
+     }
+     ```
+
+2. Publish the function (Publish tab → Publish function).
+3. Distribution → Default behavior → Edit → Function associations →
+   Viewer request → select `spa-rewrite` (CloudFront Functions). Save.
+4. Default behavior's **Custom error responses** are left empty — the
+   function rewrites SPA URIs before they hit origin, so SPA paths
+   return 200 from origin directly. `/data/*` and `/assets/*` real
+   files keep their natural 200/404 from origin.
+
+**Resulting behavior:**
+
+- `/data/videos/UNKNOWN.meta.json` → origin 404 → client 404 →
+  `NotFoundError` → "Archive not yet available" UI.
+- `/videos/abc` → rewritten to `/index.html` → 200 → SPA bootstraps
+  into the video page.
+- `/garbage` → rewritten to `/index.html` → SPA's `NotFound` page.
+- `/UCxxx/20260101_abc.html` (legacy HTML) → has `.` in last segment
+  → passed through to origin → real 200 (if file exists) or 404.
+
+The CloudFront invalidation in §9.3 explicitly never targets `/data/*`.
 
 ## 6. Page-by-page UX
 
