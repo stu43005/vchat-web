@@ -807,6 +807,27 @@ no further optimization in this spec.
 
 ### 7.2 Virtualization
 
+A single video can have tens of thousands of rows. Rendering them all
+into the DOM hangs the browser, so the chat list mounts only the rows
+currently in view (plus a small overscan buffer) and "pretends" the
+rest exist by reserving their total height in a single tall inner box.
+Three layers cooperate:
+
+- **outer scroll container** — fixed height, owns the scrollbar;
+- **inner sizing box** — `height = sum of all row heights`, so the
+  scrollbar length matches the full archive;
+- **absolutely-positioned rows** — only the visible 30–50 rows are in
+  the DOM, each `transform: translateY(...)`'d to its slot in the
+  inner box.
+
+Row heights vary widely (a one-line chat ≈ 48px, a poll ≈ 200px) so
+the virtualizer measures each row's real height on mount via
+`measureElement` and caches it; `estimateSize` is just the placeholder
+used for rows not yet measured. The `--chatlist-height` CSS variable
+(below) gives the outer container a concrete height that follows
+viewport + header changes, since the virtualizer cannot operate on an
+`auto`-height parent.
+
 `@tanstack/react-virtual` `useVirtualizer` over the `filtered` array.
 Configuration:
 
