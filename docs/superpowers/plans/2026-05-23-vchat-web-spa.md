@@ -903,7 +903,7 @@ import type {
   VideoMeta,
 } from "./types";
 
-const retryOnNon404 = (failureCount: number, error: unknown) =>
+const retryOnNon404 = (failureCount: number, error: Error) =>
   !(error instanceof NotFoundError) && failureCount < 3;
 
 export function useIndexQuery(): UseQueryResult<IndexData> {
