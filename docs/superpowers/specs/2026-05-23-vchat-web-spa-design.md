@@ -442,7 +442,8 @@ not retry (no point retrying a missing file).
 | `/videos/$videoId` | `routes/videos.$videoId.tsx` | `{ types?: FilterableType[]; sigRange?: [number, number] }` where `type FilterableType = Exclude<ChatRow["type"], "raidOutgoing">` (`raidOutgoing` is grouped under `raid` per §5.2; never appears in the URL). `sigRange` is a 2-tuple `[min, max]` with `0 <= min <= max <= 7`. |
 | any other | `__root.tsx#notFoundComponent` | n/a |
 
-Unknown search params are dropped silently (zod `.strip()` by default).
+Unknown search params are dropped silently (zod object schemas strip
+unrecognized keys by default).
 Per-field default semantics:
 
 - `tab` (Index page) — `z.enum(["live","past"]).default("live")`.

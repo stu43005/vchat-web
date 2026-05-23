@@ -114,13 +114,13 @@ Replace the scaffolded contents with:
 ```ts
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
-import { TanStackRouterVite } from "@tanstack/router-plugin/vite";
+import { tanstackRouter } from "@tanstack/router-plugin/vite";
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   return {
     plugins: [
-      TanStackRouterVite({ target: "react", autoCodeSplitting: true }),
+      tanstackRouter({ target: "react", autoCodeSplitting: true }),
       react(),
     ],
     base: "/",
@@ -1464,6 +1464,28 @@ npm run typecheck && npm run lint
 Expected: PASS. (The route tree was seeded in Task 0 step 14 with
 stubs for `/`, `/channels/$channelId`, and `/videos/$videoId`, so the
 `<Link to=...>` route literals resolve correctly here.)
+
+**Note on MUI polymorphic typing with TanStack Router `Link`.** MUI's
+`CardActionArea`, `Chip`, and `Box` accept `component={Link}` and
+forward arbitrary props at runtime, but their `OverridableComponent`
+typing does not always surface TanStack's `to` / `params` as known
+props. If typecheck flags `to` / `params` as unknown, the recommended
+fix is to create a typed-link wrapper in `src/lib/createMuiLink.ts`
+using TanStack Router's `createLink` helper, e.g.:
+
+```ts
+import { createLink, type LinkComponent } from "@tanstack/react-router";
+import { CardActionArea, Chip } from "@mui/material";
+
+export const RouterCardActionArea: LinkComponent<typeof CardActionArea> =
+  createLink(CardActionArea);
+export const RouterChip: LinkComponent<typeof Chip> = createLink(Chip);
+```
+
+Then use `RouterCardActionArea` / `RouterChip` in place of the
+`component={Link}` pattern. Only introduce this wrapper if typecheck
+actually fails; many MUI+TanStack pairings compile cleanly via
+declaration merging.
 
 - [ ] **Step 3: Commit**
 
