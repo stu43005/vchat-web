@@ -1,4 +1,3 @@
-import { useEffect, useRef, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
   Alert,
@@ -61,19 +60,6 @@ function VideoPage() {
 
   const selectedTypes = search.types ?? DEFAULT_TYPES;
   const sigRange = search.sigRange ?? DEFAULT_SIG_RANGE;
-
-  const headerRef = useRef<HTMLDivElement>(null);
-  const [headerHeight, setHeaderHeight] = useState<number>(0);
-
-  useEffect(() => {
-    const el = headerRef.current;
-    if (!el) return;
-    const write = () => setHeaderHeight(el.offsetHeight);
-    write();
-    const obs = new ResizeObserver(write);
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, [meta.isSuccess, rows.isSuccess]);
 
   // Meta error takes precedence (so a 404 surfaces "Archive not yet
   // available" immediately rather than after a skeleton flash).
@@ -147,7 +133,7 @@ function VideoPage() {
 
   return (
     <Container maxWidth="lg" sx={{ py: 2 }}>
-      <Box ref={headerRef}>
+      <Box>
         <VideoHeader video={video} timezone={timezone} />
         <CurrencyTable
           currencies={video.aggregates.currencyTable}
@@ -192,7 +178,6 @@ function VideoPage() {
           selectedTypes={selectedTypes}
           sigRange={sigRange}
           timezone={timezone}
-          headerHeight={headerHeight}
         />
       )}
     </Container>

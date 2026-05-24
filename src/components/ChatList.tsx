@@ -1,9 +1,8 @@
-import { useMemo, useRef } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Box, Typography } from "@mui/material";
-import { useVirtualizer } from "@tanstack/react-virtual";
+import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import type { ChatRow, FilterableType, VideoMeta } from "../api/types";
 import type { TimezonePref } from "../lib/format";
-import { CHATLIST_PAD_PX } from "../theme";
 import { RowDispatcher } from "./chat-rows/RowDispatcher";
 
 // Initial-render estimate for unmeasured rows. The virtualizer replaces
@@ -16,11 +15,10 @@ interface ChatListProps {
   selectedTypes: FilterableType[];
   sigRange: [number, number];
   timezone: TimezonePref;
-  headerHeight: number;
 }
 
 export function ChatList(props: ChatListProps) {
-  const { rows, video, selectedTypes, sigRange, timezone, headerHeight } = props;
+  const { rows, video, selectedTypes, sigRange, timezone } = props;
 
   const filtered = useMemo<ChatRow[]>(() => {
     const typeSet = new Set<FilterableType>(selectedTypes);
@@ -36,19 +34,34 @@ export function ChatList(props: ChatListProps) {
     });
   }, [rows, selectedTypes, sigRange]);
 
-  const containerRef = useRef<HTMLDivElement>(null);
+  // Window virtualization: the page itself scrolls. We need to tell the
+  // virtualizer how far the list starts from the top of the document so it
+  // can place items at the right viewport offsets.
+  const parentRef = useRef<HTMLDivElement>(null);
+  const [scrollMargin, setScrollMargin] = useState(0);
 
-  // useVirtualizer trips react-hooks/incompatible-library (the rule has a
-  // hardcoded incompatible-library list, no configurable allowlist).
-  // Suppression is what TanStack's own tanstack.com codebase does — see
-  // upstream issue TanStack/virtual#1119. Revisit once that is resolved
-  // or if this project ever opts into React Compiler.
-  // eslint-disable-next-line react-hooks/incompatible-library
-  const virtualizer = useVirtualizer({
+  useLayoutEffect(() => {
+    const el = parentRef.current;
+    if (!el) return;
+    const update = () => {
+      const rect = el.getBoundingClientRect();
+      setScrollMargin(rect.top + window.scrollY);
+    };
+    update();
+    const obs = new ResizeObserver(update);
+    obs.observe(document.documentElement);
+    window.addEventListener("resize", update);
+    return () => {
+      obs.disconnect();
+      window.removeEventListener("resize", update);
+    };
+  }, []);
+
+  const virtualizer = useWindowVirtualizer({
     count: filtered.length,
-    getScrollElement: () => containerRef.current,
     estimateSize: () => ESTIMATED_ROW_HEIGHT_PX,
     overscan: 8,
+    scrollMargin,
   });
 
   if (selectedTypes.length === 0) {
@@ -71,37 +84,40 @@ export function ChatList(props: ChatListProps) {
 
   return (
     <Box
-      ref={containerRef}
+      ref={parentRef}
       sx={{
-        height: `calc(100vh - var(--topbar-h, 64px) - ${headerHeight}px - ${CHATLIST_PAD_PX}px)`,
-        overflow: "auto",
         border: 1,
         borderColor: "divider",
         borderRadius: 1,
       }}
     >
       <Box sx={{ height: `${virtualizer.getTotalSize()}px`, position: "relative" }}>
-        {items.map((item) => (
-          <Box
-            key={item.key}
-            data-index={item.index}
-            ref={virtualizer.measureElement}
-            sx={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              width: "100%",
-              transform: `translateY(${item.start}px)`,
-            }}
-          >
-            <RowDispatcher
-              row={filtered[item.index]}
-              no={item.index + 1}
-              video={video}
-              timezone={timezone}
-            />
-          </Box>
-        ))}
+        {/* Block-translate: one transform on the wrapper instead of N per-item
+            transforms. Items stack in normal flow under the offset wrapper. */}
+        <Box
+          sx={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: "100%",
+            transform: `translateY(${(items[0]?.start ?? 0) - scrollMargin}px)`,
+          }}
+        >
+          {items.map((item) => (
+            <Box
+              key={item.key}
+              data-index={item.index}
+              ref={virtualizer.measureElement}
+            >
+              <RowDispatcher
+                row={filtered[item.index]}
+                no={item.index + 1}
+                video={video}
+                timezone={timezone}
+              />
+            </Box>
+          ))}
+        </Box>
       </Box>
     </Box>
   );

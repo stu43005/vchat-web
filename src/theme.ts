@@ -1,7 +1,5 @@
 import { createTheme, type Theme } from "@mui/material/styles";
 
-export const CHATLIST_PAD_PX = 16;
-
 const baseOptions = {
   shape: { borderRadius: 8 },
   typography: {
