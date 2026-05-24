@@ -62,6 +62,12 @@ export function ChatList(props: ChatListProps) {
     estimateSize: () => ESTIMATED_ROW_HEIGHT_PX,
     overscan: 8,
     scrollMargin,
+    // The virtualizer would otherwise call window.scrollTo on mount (using a
+    // stale window.scrollY captured before the router's scroll reset runs)
+    // and again on every resize adjustment as items are measured. Both fight
+    // TanStack Router's scrollRestoration. Neutralizing scrollToFn lets the
+    // router own window scroll. See TanStack/virtual#997, TanStack/router#4107.
+    scrollToFn: () => {},
   });
 
   if (selectedTypes.length === 0) {
