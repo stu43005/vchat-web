@@ -12,12 +12,13 @@ import {
   useTheme,
 } from "@mui/material";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
+import Brightness7Icon from "@mui/icons-material/Brightness7";
 import Brightness4Icon from "@mui/icons-material/Brightness4";
 import { Link, useMatch } from "@tanstack/react-router";
 import {
-  useThemePref,
+  useResolvedTheme,
+  useToggleTheme,
   useTimezonePref,
-  type ThemePref,
 } from "../lib/settings";
 import type { TimezonePref } from "../lib/format";
 import { useChannelQuery, useVideoMetaQuery } from "../api/queries";
@@ -79,13 +80,6 @@ const TIMEZONE_LABELS: Record<TimezonePref, string> = {
   UTC: "UTC",
 };
 
-const THEMES: ThemePref[] = ["light", "dark", "system"];
-const THEME_LABELS: Record<ThemePref, string> = {
-  light: "Light",
-  dark: "Dark",
-  system: "System",
-};
-
 function CrumbLink({ crumb }: { crumb: Crumb }) {
   const baseSx = {
     color: "inherit",
@@ -97,9 +91,10 @@ function CrumbLink({ crumb }: { crumb: Crumb }) {
     display: "inline-block",
     verticalAlign: "bottom",
   };
+  const linkSx = { ...baseSx, cursor: "pointer" };
   if (crumb.kind === "home") {
     return (
-      <RouterBox to="/" sx={baseSx}>
+      <RouterBox to="/" sx={linkSx}>
         {crumb.label}
       </RouterBox>
     );
@@ -109,7 +104,7 @@ function CrumbLink({ crumb }: { crumb: Crumb }) {
       <RouterBox
         to="/channels/$channelId"
         params={{ channelId: crumb.channelId }}
-        sx={baseSx}
+        sx={linkSx}
       >
         {crumb.label}
       </RouterBox>
@@ -121,9 +116,9 @@ function CrumbLink({ crumb }: { crumb: Crumb }) {
 export function TopBar() {
   const appBarRef = useRef<HTMLDivElement>(null);
   const [timezone, setTimezone] = useTimezonePref();
-  const [theme, setTheme] = useThemePref();
+  const resolvedTheme = useResolvedTheme();
+  const toggleTheme = useToggleTheme();
   const [tzAnchor, setTzAnchor] = useState<HTMLElement | null>(null);
-  const [themeAnchor, setThemeAnchor] = useState<HTMLElement | null>(null);
   const crumbs = useBreadcrumbs();
   const muiTheme = useTheme();
   const isMobile = useMediaQuery(muiTheme.breakpoints.down("sm"));
@@ -185,30 +180,9 @@ export function TopBar() {
             </MenuItem>
           ))}
         </Menu>
-        <IconButton
-          onClick={(e: MouseEvent<HTMLElement>) => setThemeAnchor(e.currentTarget)}
-          aria-label="theme"
-        >
-          <Brightness4Icon />
+        <IconButton onClick={toggleTheme} aria-label="toggle theme">
+          {resolvedTheme === "dark" ? <Brightness7Icon /> : <Brightness4Icon />}
         </IconButton>
-        <Menu
-          anchorEl={themeAnchor}
-          open={Boolean(themeAnchor)}
-          onClose={() => setThemeAnchor(null)}
-        >
-          {THEMES.map((t) => (
-            <MenuItem
-              key={t}
-              selected={t === theme}
-              onClick={() => {
-                setTheme(t);
-                setThemeAnchor(null);
-              }}
-            >
-              {THEME_LABELS[t]}
-            </MenuItem>
-          ))}
-        </Menu>
       </Toolbar>
     </AppBar>
   );
