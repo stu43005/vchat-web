@@ -742,6 +742,16 @@ export function legacyVideoHref(
 ): string {
   return `/${channel.id}/${ymdInTokyo(video.availableAt)}_${video.id}.html`;
 }
+
+export function formatSuperAmount(row: {
+  currency: string;
+  amount: number;
+  jpyAmount: number;
+}): string {
+  return row.currency === "JPY"
+    ? formatCurrency(row.jpyAmount, "JPY")
+    : `${formatCurrency(row.amount, row.currency)} (${formatCurrency(row.jpyAmount, "JPY")})`;
+}
 ```
 
 - [ ] **Step 2: Verify typecheck + lint**
@@ -2461,6 +2471,9 @@ git commit -m "feat: FilterChips with type toggles + significance range slider"
 ## Task 20: Chat row components + RowDispatcher
 
 **Files:**
+
+- Create: `src/components/chat-rows/constants.ts`
+- Create: `src/components/chat-rows/ColorBadge.tsx`
 - Create: `src/components/chat-rows/RowDispatcher.tsx`
 - Create: `src/components/chat-rows/TimestampLink.tsx`
 - Create: `src/components/chat-rows/ChatRowBase.tsx`
@@ -2476,6 +2489,35 @@ git commit -m "feat: FilterChips with type toggles + significance range slider"
 - Create: `src/components/chat-rows/RaidOutgoingRow.tsx`
 
 ### Steps
+
+- [ ] **Step 1a: Write `src/components/chat-rows/constants.ts`**
+
+```ts
+// YouTube membership / channel-owner accent (matches honeybee legacy HTML).
+export const MEMBERSHIP_GREEN = "#00984f";
+export const MODERATOR_BLUE = "#5e84f1";
+export const VERIFIED_GREY = "#888";
+```
+
+- [ ] **Step 1b: Write `src/components/chat-rows/ColorBadge.tsx`**
+
+```tsx
+import { Box } from "@mui/material";
+
+export function ColorBadge({ color }: { color?: string }) {
+  return (
+    <Box
+      sx={{
+        width: 8,
+        minHeight: 24,
+        bgcolor: color ?? "transparent",
+        borderRadius: 0.5,
+        flexShrink: 0,
+      }}
+    />
+  );
+}
+```
 
 - [ ] **Step 1: Write `src/components/chat-rows/ChatRowBase.tsx`** (shared grid wrapper)
 
@@ -2571,12 +2613,13 @@ export function TimestampLink({ row, video, timezone }: TimestampLinkProps) {
 import type { ChatRowChat, VideoMeta } from "../../api/types";
 import type { TimezonePref } from "../../lib/format";
 import { ChatRowBase } from "./ChatRowBase";
+import { MEMBERSHIP_GREEN, MODERATOR_BLUE, VERIFIED_GREY } from "./constants";
 import { TimestampLink } from "./TimestampLink";
 
 const AUTHOR_BORDER: Record<string, string> = {
-  owner: "#00984f",
-  moderator: "#5e84f1",
-  verified: "#888",
+  owner: MEMBERSHIP_GREEN,
+  moderator: MODERATOR_BLUE,
+  verified: VERIFIED_GREY,
 };
 
 interface Props {
@@ -2606,8 +2649,9 @@ export function ChatRow({ row, no, video, timezone }: Props) {
 ```tsx
 import { Box, Typography } from "@mui/material";
 import type { ChatRowSuperChat, VideoMeta } from "../../api/types";
-import { formatCurrency, type TimezonePref } from "../../lib/format";
+import { formatSuperAmount, type TimezonePref } from "../../lib/format";
 import { ChatRowBase } from "./ChatRowBase";
+import { ColorBadge } from "./ColorBadge";
 import { TimestampLink } from "./TimestampLink";
 
 interface Props {
@@ -2618,10 +2662,7 @@ interface Props {
 }
 
 export function SuperChatRow({ row, no, video, timezone }: Props) {
-  const amount =
-    row.currency === "JPY"
-      ? formatCurrency(row.jpyAmount, "JPY")
-      : `${formatCurrency(row.amount, row.currency)} (${formatCurrency(row.jpyAmount, "JPY")})`;
+  const amount = formatSuperAmount(row);
 
   return (
     <ChatRowBase
@@ -2631,15 +2672,7 @@ export function SuperChatRow({ row, no, video, timezone }: Props) {
       author={row.authorName ?? ""}
       body={
         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-          <Box
-            sx={{
-              width: 8,
-              minHeight: 24,
-              bgcolor: row.color ?? "transparent",
-              borderRadius: 0.5,
-              flexShrink: 0,
-            }}
-          />
+          <ColorBadge color={row.color ?? undefined} />
           <Typography variant="body2" sx={{ fontFamily: "monospace" }}>
             {amount}
           </Typography>
@@ -2662,8 +2695,9 @@ export function SuperChatRow({ row, no, video, timezone }: Props) {
 ```tsx
 import { Box, Typography } from "@mui/material";
 import type { ChatRowSuperSticker, VideoMeta } from "../../api/types";
-import { formatCurrency, type TimezonePref } from "../../lib/format";
+import { formatSuperAmount, type TimezonePref } from "../../lib/format";
 import { ChatRowBase } from "./ChatRowBase";
+import { ColorBadge } from "./ColorBadge";
 import { TimestampLink } from "./TimestampLink";
 
 interface Props {
@@ -2674,10 +2708,7 @@ interface Props {
 }
 
 export function SuperStickerRow({ row, no, video, timezone }: Props) {
-  const amount =
-    row.currency === "JPY"
-      ? formatCurrency(row.jpyAmount, "JPY")
-      : `${formatCurrency(row.amount, row.currency)} (${formatCurrency(row.jpyAmount, "JPY")})`;
+  const amount = formatSuperAmount(row);
 
   return (
     <ChatRowBase
@@ -2687,15 +2718,7 @@ export function SuperStickerRow({ row, no, video, timezone }: Props) {
       author={row.authorName ?? ""}
       body={
         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-          <Box
-            sx={{
-              width: 8,
-              minHeight: 24,
-              bgcolor: row.color ?? "transparent",
-              borderRadius: 0.5,
-              flexShrink: 0,
-            }}
-          />
+          <ColorBadge color={row.color ?? undefined} />
           <Typography variant="body2" sx={{ fontFamily: "monospace" }}>
             {amount}
           </Typography>
@@ -2722,6 +2745,7 @@ import { Box } from "@mui/material";
 import type { ChatRowMembership, VideoMeta } from "../../api/types";
 import type { TimezonePref } from "../../lib/format";
 import { ChatRowBase } from "./ChatRowBase";
+import { MEMBERSHIP_GREEN } from "./constants";
 import { TimestampLink } from "./TimestampLink";
 
 interface Props {
@@ -2740,7 +2764,7 @@ export function MembershipRow({ row, no, video, timezone }: Props) {
       photo={row.authorPhoto}
       author={row.authorName ?? ""}
       body={
-        <Box sx={{ borderLeft: "4px solid #00984f", pl: 1 }}>
+        <Box sx={{ borderLeft: `4px solid ${MEMBERSHIP_GREEN}`, pl: 1 }}>
           Joined as a member ({label})
         </Box>
       }
@@ -2756,6 +2780,7 @@ import { Box } from "@mui/material";
 import type { ChatRowMembershipGift, VideoMeta } from "../../api/types";
 import type { TimezonePref } from "../../lib/format";
 import { ChatRowBase } from "./ChatRowBase";
+import { MEMBERSHIP_GREEN } from "./constants";
 import { TimestampLink } from "./TimestampLink";
 
 interface Props {
@@ -2773,7 +2798,7 @@ export function MembershipGiftRow({ row, no, video, timezone }: Props) {
       photo={row.authorPhoto}
       author={row.authorName ?? ""}
       body={
-        <Box sx={{ borderLeft: "4px solid #00984f", pl: 1 }}>
+        <Box sx={{ borderLeft: `4px solid ${MEMBERSHIP_GREEN}`, pl: 1 }}>
           Received a membership gift from {row.senderName ?? "N/A"}
         </Box>
       }
@@ -2789,6 +2814,7 @@ import { Box } from "@mui/material";
 import type { ChatRowMembershipGiftPurchase, VideoMeta } from "../../api/types";
 import type { TimezonePref } from "../../lib/format";
 import { ChatRowBase } from "./ChatRowBase";
+import { MEMBERSHIP_GREEN } from "./constants";
 import { TimestampLink } from "./TimestampLink";
 
 interface Props {
@@ -2806,7 +2832,7 @@ export function MembershipGiftPurchaseRow({ row, no, video, timezone }: Props) {
       photo={row.authorPhoto}
       author={row.authorName ?? ""}
       body={
-        <Box sx={{ borderLeft: "4px solid #00984f", pl: 1 }}>
+        <Box sx={{ borderLeft: `4px solid ${MEMBERSHIP_GREEN}`, pl: 1 }}>
           Purchased {row.amount} membership gift(s)
         </Box>
       }
@@ -2822,6 +2848,7 @@ import { Box, Typography } from "@mui/material";
 import type { ChatRowMilestone, VideoMeta } from "../../api/types";
 import type { TimezonePref } from "../../lib/format";
 import { ChatRowBase } from "./ChatRowBase";
+import { MEMBERSHIP_GREEN } from "./constants";
 import { TimestampLink } from "./TimestampLink";
 
 interface Props {
@@ -2839,7 +2866,7 @@ export function MilestoneRow({ row, no, video, timezone }: Props) {
       photo={row.authorPhoto}
       author={row.authorName ?? ""}
       body={
-        <Box sx={{ borderLeft: "4px solid #00984f", pl: 1 }}>
+        <Box sx={{ borderLeft: `4px solid ${MEMBERSHIP_GREEN}`, pl: 1 }}>
           {row.message !== null ? (
             row.message
           ) : (
@@ -2945,7 +2972,7 @@ export function RaidOutgoingRow({ row, no, video, timezone }: Props) {
       timestamp={<TimestampLink row={row} video={video} timezone={timezone} />}
       photo={row.originPhoto ?? null}
       author="Raid (outgoing)"
-      body={`Sending you to ${row.originName ?? ""}`}
+      body={`Sending you to ${row.originName ?? "unknown channel"}`}
     />
   );
 }
@@ -2996,6 +3023,11 @@ export function RowDispatcher({ row, no, video, timezone }: Props) {
       return <RaidRow row={row} no={no} video={video} timezone={timezone} />;
     case "raidOutgoing":
       return <RaidOutgoingRow row={row} no={no} video={video} timezone={timezone} />;
+    default: {
+      const _exhaustive: never = row;
+      void _exhaustive;
+      return null;
+    }
   }
 }
 ```
