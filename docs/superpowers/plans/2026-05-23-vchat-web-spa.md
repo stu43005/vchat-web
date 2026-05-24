@@ -3067,6 +3067,10 @@ import type { TimezonePref } from "../lib/format";
 import { CHATLIST_PAD_PX } from "../theme";
 import { RowDispatcher } from "./chat-rows/RowDispatcher";
 
+// Initial-render estimate for unmeasured rows. The virtualizer replaces
+// each row's height with the real measurement as it scrolls into view.
+const ESTIMATED_ROW_HEIGHT_PX = 64;
+
 interface ChatListProps {
   rows: ChatRow[];
   video: VideoMeta;
@@ -3100,6 +3104,9 @@ export function ChatList(props: ChatListProps) {
       "--chatlist-height",
       `calc(100vh - var(--topbar-h, 64px) - ${headerHeight}px - ${CHATLIST_PAD_PX}px)`,
     );
+    return () => {
+      document.documentElement.style.removeProperty("--chatlist-height");
+    };
   }, [headerHeight]);
 
   // useVirtualizer trips react-hooks/incompatible-library (the rule has a
@@ -3111,7 +3118,7 @@ export function ChatList(props: ChatListProps) {
   const virtualizer = useVirtualizer({
     count: filtered.length,
     getScrollElement: () => containerRef.current,
-    estimateSize: () => 64,
+    estimateSize: () => ESTIMATED_ROW_HEIGHT_PX,
     overscan: 8,
   });
 
