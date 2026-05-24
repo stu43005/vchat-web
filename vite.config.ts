@@ -4,6 +4,12 @@ import { tanstackRouter } from "@tanstack/router-plugin/vite";
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
+  const proxyTarget = env.VITE_DATA_PROXY;
+  if (!proxyTarget) {
+    console.warn(
+      "[vite] VITE_DATA_PROXY is not set; /data dev proxy disabled. Requests to /data/* will 404 unless the bucket is mounted locally.",
+    );
+  }
   return {
     plugins: [
       tanstackRouter({ target: "react", autoCodeSplitting: true }),
@@ -15,12 +21,14 @@ export default defineConfig(({ mode }) => {
       outDir: "dist",
     },
     server: {
-      proxy: {
-        "/data": {
-          target: env.VITE_DATA_PROXY ?? "https://archive.example.com",
-          changeOrigin: true,
-        },
-      },
+      proxy: proxyTarget
+        ? {
+            "/data": {
+              target: proxyTarget,
+              changeOrigin: true,
+            },
+          }
+        : undefined,
     },
   };
 });

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useMemo, useRef } from "react";
 import { Box, Typography } from "@mui/material";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { ChatRow, FilterableType, VideoMeta } from "../api/types";
@@ -38,16 +38,6 @@ export function ChatList(props: ChatListProps) {
 
   const containerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    document.documentElement.style.setProperty(
-      "--chatlist-height",
-      `calc(100vh - var(--topbar-h, 64px) - ${headerHeight}px - ${CHATLIST_PAD_PX}px)`,
-    );
-    return () => {
-      document.documentElement.style.removeProperty("--chatlist-height");
-    };
-  }, [headerHeight]);
-
   // useVirtualizer trips react-hooks/incompatible-library (the rule has a
   // hardcoded incompatible-library list, no configurable allowlist).
   // Suppression is what TanStack's own tanstack.com codebase does — see
@@ -83,7 +73,7 @@ export function ChatList(props: ChatListProps) {
     <Box
       ref={containerRef}
       sx={{
-        height: "var(--chatlist-height)",
+        height: `calc(100vh - var(--topbar-h, 64px) - ${headerHeight}px - ${CHATLIST_PAD_PX}px)`,
         overflow: "auto",
         border: 1,
         borderColor: "divider",
