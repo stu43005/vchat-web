@@ -20,9 +20,12 @@ export default defineConfig([
     },
   },
   {
-    // TanStack Router file-based routes export `Route` (not a component)
-    // alongside their `component`/`notFoundComponent`. Framework convention,
-    // incompatible with react-refresh/only-export-components.
+    // TanStack Router file-based routes co-locate the `Route` export with
+    // a locally-defined component (e.g. `function RootLayout()`), which
+    // the `react-refresh/only-export-components` rule flags. Splitting
+    // each component into a separate file fights the file-based-routing
+    // pattern; disabling the rule for `src/routes/**` is the pragmatic
+    // community convention (TanStack Router has no official guidance).
     files: ['src/routes/**/*.{ts,tsx}'],
     rules: {
       'react-refresh/only-export-components': 'off',
