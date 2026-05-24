@@ -43,7 +43,7 @@ export function FilterChips(props: FilterChipsProps) {
 
   return (
     <Box sx={{ my: 2 }}>
-      <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1 }}>
+      <Stack direction="row" useFlexGap sx={{ flexWrap: "wrap", gap: 1 }}>
         {CHIPS.map((chip) => (
           <Chip
             key={chip.key}
@@ -67,10 +67,11 @@ export function FilterChips(props: FilterChipsProps) {
           marks
           valueLabelDisplay="auto"
           onChange={(_, raw) => {
-            const v = raw as [number, number];
-            const next: [number, number] =
-              v[0] <= v[1] ? [v[0], v[1]] : [v[1], v[0]];
-            onSigRangeChange(next);
+            // Range mode (value is a tuple) always yields a 2-element array;
+            // narrow defensively so type safety isn't bypassed.
+            if (!Array.isArray(raw) || raw.length !== 2) return;
+            const [a, b] = raw;
+            onSigRangeChange(a <= b ? [a, b] : [b, a]);
           }}
         />
       </Box>
