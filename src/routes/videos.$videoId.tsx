@@ -143,11 +143,19 @@ function VideoPage() {
           aggregates={video.aggregates}
           selectedTypes={selectedTypes}
           onTypesChange={(next) =>
-            navigate({ search: { ...search, types: next }, replace: true })
+            navigate({
+              search: { ...search, types: next },
+              replace: true,
+              resetScroll: false,
+            })
           }
           sigRange={sigRange}
           onSigRangeChange={(next) =>
-            navigate({ search: { ...search, sigRange: next }, replace: true })
+            navigate({
+              search: { ...search, sigRange: next },
+              replace: true,
+              resetScroll: false,
+            })
           }
         />
       </Box>
