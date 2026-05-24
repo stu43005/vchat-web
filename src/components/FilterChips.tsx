@@ -1,5 +1,6 @@
 import { Box, Chip, Slider, Stack, Typography } from "@mui/material";
 import type { FilterableType, VideoAggregates } from "../api/types";
+import { warnOnce } from "../lib/jsonl";
 
 const CHIPS: Array<{
   key: FilterableType;
@@ -67,9 +68,16 @@ export function FilterChips(props: FilterChipsProps) {
           marks
           valueLabelDisplay="auto"
           onChange={(_, raw) => {
-            // Range mode (value is a tuple) always yields a 2-element array;
-            // narrow defensively so type safety isn't bypassed.
-            if (!Array.isArray(raw) || raw.length !== 2) return;
+            // Range mode (value is a tuple) always yields a 2-element array.
+            // If MUI ever changes that contract, warn rather than silently
+            // dropping the change.
+            if (!Array.isArray(raw) || raw.length !== 2) {
+              warnOnce(
+                "FilterChips slider shape",
+                `expected [number, number], got ${JSON.stringify(raw)}`,
+              );
+              return;
+            }
             const [a, b] = raw;
             onSigRangeChange(a <= b ? [a, b] : [b, a]);
           }}
