@@ -35,7 +35,7 @@ const filterableTypeEnum = z.enum([
 const videoSearchSchema = z.object({
   types: z.array(filterableTypeEnum).optional(),
   sigRange: z
-    .tuple([z.number().int().min(0).max(7), z.number().int().min(0).max(7)])
+    .tuple([z.number().int().min(1).max(7), z.number().int().min(1).max(7)])
     .refine(([lo, hi]) => lo <= hi, { message: "lo must be <= hi" })
     .optional(),
 });

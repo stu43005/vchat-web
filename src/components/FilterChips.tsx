@@ -62,7 +62,7 @@ export function FilterChips(props: FilterChipsProps) {
         </Typography>
         <Slider
           value={sigRange}
-          min={0}
+          min={1}
           max={7}
           step={1}
           marks
