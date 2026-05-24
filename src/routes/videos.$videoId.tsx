@@ -73,7 +73,7 @@ function VideoPage() {
     const obs = new ResizeObserver(write);
     obs.observe(el);
     return () => obs.disconnect();
-  }, [meta.data]);
+  }, [meta.data, rows.isPending]);
 
   // Meta error takes precedence (so a 404 surfaces "Archive not yet
   // available" immediately rather than after a skeleton flash).
