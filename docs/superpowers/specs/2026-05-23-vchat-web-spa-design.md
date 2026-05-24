@@ -117,7 +117,8 @@ vchat-web/
 │   ├── lib/
 │   │   ├── format.ts                # currency, timestamp, YouTube URL helpers
 │   │   ├── currency.ts              # verbatim copy of honeybee currencyMap
-│   │   ├── jsonl.ts                 # parseJSONL(text): ChatRow[] + warnOnce
+│   │   ├── jsonl.ts                 # parseJSONL(text): ChatRow[]
+│   │   ├── warn.ts                  # warnOnce — deduped console warnings
 │   │   ├── settings.ts              # theme + timezone hook (localStorage)
 │   │   └── useDocumentTitle.ts      # sets document.title per route
 │   └── theme.ts                     # MUI light/dark themes
@@ -358,24 +359,36 @@ export async function fetchJsonl<T>(path: string): Promise<T[]> {
 }
 ```
 
+`warnOnce` is a tiny generic helper used by `parseJSONL` and by other
+unknown-input branches in the UI (status text, slider shape, etc.).
+It lives in its own module so it isn't tied to JSONL parsing:
+
+```ts
+// src/lib/warn.ts
+const warned = new Set<string>();
+// Truncate the dedup key so a pathologically long detail can't bloat
+// memory. The full detail still appears in the logged warning.
+const KEY_MAX = 200;
+export function warnOnce(label: string, detail: string): void {
+  const raw = `${label}:${detail}`;
+  const key = raw.length > KEY_MAX ? raw.slice(0, KEY_MAX) : raw;
+  if (warned.has(key)) return;
+  warned.add(key);
+  console.warn(`[vchat] ${label}: ${detail}`);
+}
+```
+
 `parseJSONL` lives in `src/lib/jsonl.ts`:
 
 ```ts
 import type { ChatRow } from "../api/types";
+import { warnOnce } from "./warn";
 
 const KNOWN_TYPES = new Set<ChatRow["type"]>([
   "chat", "superChat", "superSticker", "membership",
   "membershipGift", "membershipGiftPurchase", "milestone",
   "poll", "raid", "raidOutgoing",
 ]);
-
-const warned = new Set<string>();
-export function warnOnce(label: string, detail: string): void {
-  const key = `${label}:${detail}`;
-  if (warned.has(key)) return;
-  warned.add(key);
-  console.warn(`[vchat] ${label}: ${detail}`);
-}
 
 export function parseJSONL<T>(text: string): T[] {
   const out: T[] = [];
@@ -1242,7 +1255,7 @@ After deployment to a non-production S3 bucket pointed at a real
 - Unknown JSONL row types and unknown `VideoStatus` values do not crash
   the UI: unknown rows are dropped (`parseJSONL` in §4.2), unknown
   statuses render via the default branch (§6.4 #1). Both call
-  `warnOnce(label, detail)` from `src/lib/jsonl.ts`, which keeps a
+  `warnOnce(label, detail)` from `src/lib/warn.ts`, which keeps a
   module-level `Set<string>` deduping by `${label}:${detail}` so each
   unique offender produces exactly one `console.warn` per page session.
 - No analytics, no error reporting service, no third-party scripts.

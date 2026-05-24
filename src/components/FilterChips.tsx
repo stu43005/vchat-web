@@ -1,6 +1,6 @@
 import { Box, Chip, Slider, Stack, Typography } from "@mui/material";
 import type { FilterableType, VideoAggregates } from "../api/types";
-import { warnOnce } from "../lib/jsonl";
+import { warnOnce } from "../lib/warn";
 
 const CHIPS: Array<{
   key: FilterableType;

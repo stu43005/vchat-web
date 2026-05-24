@@ -1,7 +1,7 @@
 import { Box } from "@mui/material";
 import type { VideoStatus } from "../api/types";
 import { formatTimestamp, type TimezonePref } from "../lib/format";
-import { warnOnce } from "../lib/jsonl";
+import { warnOnce } from "../lib/warn";
 
 interface StatusTextProps {
   status: VideoStatus | string;

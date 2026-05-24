@@ -1,4 +1,5 @@
 import type { ChatRow } from "../api/types";
+import { warnOnce } from "./warn";
 
 const KNOWN_TYPES: ReadonlySet<ChatRow["type"]> = new Set([
   "chat",
@@ -12,15 +13,6 @@ const KNOWN_TYPES: ReadonlySet<ChatRow["type"]> = new Set([
   "raid",
   "raidOutgoing",
 ]);
-
-const warned = new Set<string>();
-
-export function warnOnce(label: string, detail: string): void {
-  const key = `${label}:${detail}`;
-  if (warned.has(key)) return;
-  warned.add(key);
-  console.warn(`[vchat] ${label}: ${detail}`);
-}
 
 export function parseJSONL<T>(text: string): T[] {
   const out: T[] = [];

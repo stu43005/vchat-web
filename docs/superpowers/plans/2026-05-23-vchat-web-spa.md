@@ -761,17 +761,43 @@ git commit -m "feat: format helpers (currency, timestamp, YouTube URL, legacy hr
 
 ---
 
-## Task 4: JSONL parser (`src/lib/jsonl.ts`)
+## Task 4: warnOnce helper + JSONL parser
+
+`warnOnce` is a generic deduplicating console warning used in multiple
+places (JSONL row type, unknown status, Slider shape, etc.) — it
+lives in its own tiny module, not bundled into the JSONL parser.
 
 **Files:**
+
+- Create: `src/lib/warn.ts`
 - Create: `src/lib/jsonl.ts`
 
 ### Steps
 
-- [ ] **Step 1: Write `src/lib/jsonl.ts`**
+- [ ] **Step 1: Write `src/lib/warn.ts`**
+
+```ts
+const warned = new Set<string>();
+
+// Truncate the dedup key so a pathologically long detail can't bloat
+// memory. The full detail still appears in the logged warning — only
+// the in-memory dedup key is capped.
+const KEY_MAX = 200;
+
+export function warnOnce(label: string, detail: string): void {
+  const raw = `${label}:${detail}`;
+  const key = raw.length > KEY_MAX ? raw.slice(0, KEY_MAX) : raw;
+  if (warned.has(key)) return;
+  warned.add(key);
+  console.warn(`[vchat] ${label}: ${detail}`);
+}
+```
+
+- [ ] **Step 2: Write `src/lib/jsonl.ts`**
 
 ```ts
 import type { ChatRow } from "../api/types";
+import { warnOnce } from "./warn";
 
 const KNOWN_TYPES: ReadonlySet<ChatRow["type"]> = new Set([
   "chat",
@@ -785,15 +811,6 @@ const KNOWN_TYPES: ReadonlySet<ChatRow["type"]> = new Set([
   "raid",
   "raidOutgoing",
 ]);
-
-const warned = new Set<string>();
-
-export function warnOnce(label: string, detail: string): void {
-  const key = `${label}:${detail}`;
-  if (warned.has(key)) return;
-  warned.add(key);
-  console.warn(`[vchat] ${label}: ${detail}`);
-}
 
 export function parseJSONL<T>(text: string): T[] {
   const out: T[] = [];
@@ -813,7 +830,7 @@ export function parseJSONL<T>(text: string): T[] {
 }
 ```
 
-- [ ] **Step 2: Verify typecheck + lint**
+- [ ] **Step 3: Verify typecheck + lint**
 
 ```bash
 npm run typecheck && npm run lint
@@ -821,11 +838,11 @@ npm run typecheck && npm run lint
 
 Expected: PASS.
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 4: Commit**
 
 ```bash
-git add src/lib/jsonl.ts
-git commit -m "feat: parseJSONL + warnOnce helper for unknown row types"
+git add src/lib/warn.ts src/lib/jsonl.ts
+git commit -m "feat: warnOnce helper + parseJSONL with unknown-type filtering"
 ```
 
 ---
@@ -1234,7 +1251,7 @@ git commit -m "feat: NotFound component"
 import { Box } from "@mui/material";
 import type { VideoStatus } from "../api/types";
 import { formatTimestamp, type TimezonePref } from "../lib/format";
-import { warnOnce } from "../lib/jsonl";
+import { warnOnce } from "../lib/warn";
 
 interface StatusTextProps {
   status: VideoStatus | string;
@@ -2336,7 +2353,7 @@ git commit -m "feat: CurrencyTable component"
 ```tsx
 import { Box, Chip, Slider, Stack, Typography } from "@mui/material";
 import type { FilterableType, VideoAggregates } from "../api/types";
-import { warnOnce } from "../lib/jsonl";
+import { warnOnce } from "../lib/warn";
 
 const CHIPS: Array<{
   key: FilterableType;
