@@ -16,7 +16,6 @@ import { FilterChips } from "../components/FilterChips";
 import { ChatList } from "../components/ChatList";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
 import { useTimezonePref } from "../lib/settings";
-import { legacyVideoHref } from "../lib/format";
 import type { FilterableType } from "../api/types";
 
 const filterableTypeEnum = z.enum([
@@ -108,28 +107,6 @@ function VideoPage() {
   }
 
   const video = meta.data;
-  if (video.archiveVersion < 2) {
-    return (
-      <Container sx={{ py: 2 }}>
-        <Alert
-          severity="warning"
-          action={
-            <Button
-              component="a"
-              href={legacyVideoHref(video, video.channel)}
-              target="_blank"
-              rel="noopener noreferrer"
-              size="small"
-            >
-              Open legacy archive
-            </Button>
-          }
-        >
-          This archive predates the JSON format.
-        </Alert>
-      </Container>
-    );
-  }
 
   return (
     <Container maxWidth="lg" sx={{ py: 2 }}>
