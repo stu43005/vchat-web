@@ -8,6 +8,7 @@ import {
 } from "@mui/material";
 import type { CurrencyAgg } from "../api/types";
 import { formatCurrency } from "../lib/format";
+import { currencyMap } from "../lib/currency";
 
 interface CurrencyTableProps {
   currencies: CurrencyAgg[];
@@ -24,6 +25,7 @@ export function CurrencyTable({ currencies, jpyTotal }: CurrencyTableProps) {
         <TableHead>
           <TableRow>
             <TableCell>code</TableCell>
+            <TableCell>symbol</TableCell>
             <TableCell align="right">sum</TableCell>
             <TableCell align="right">sum (JPY)</TableCell>
           </TableRow>
@@ -32,6 +34,7 @@ export function CurrencyTable({ currencies, jpyTotal }: CurrencyTableProps) {
           {currencies.map((c) => (
             <TableRow key={c.currency}>
               <TableCell>{c.currency}</TableCell>
+              <TableCell>{currencyMap[c.currency]?.symbol ?? c.currency}</TableCell>
               <TableCell align="right">
                 {formatCurrency(c.amount, c.currency, "decimal")}
               </TableCell>
@@ -41,6 +44,7 @@ export function CurrencyTable({ currencies, jpyTotal }: CurrencyTableProps) {
             </TableRow>
           ))}
           <TableRow>
+            <TableCell />
             <TableCell />
             <TableCell />
             <TableCell align="right">
