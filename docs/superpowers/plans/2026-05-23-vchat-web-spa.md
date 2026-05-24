@@ -1748,54 +1748,86 @@ git commit -m "feat: TopBar with breadcrumb, timezone toggle, theme toggle"
 
 ---
 
-## Task 14: Bootstrap `main.tsx` + providers + router
+## Task 14: Bootstrap (`main.tsx` + `App.tsx` + `router.ts`)
+
+Three small files matching React/Vite/TanStack Router convention:
+
+- `src/main.tsx` — entry: `createRoot` + `<StrictMode>` + `<App />`. No
+  inline components, no providers. Just DOM mount.
+- `src/App.tsx` — root React component. Composes all providers
+  (QueryClient → Theme → Router). Importable in tests/Storybook
+  without DOM side effects.
+- `src/router.ts` — TanStack Router instance + `declare module Register`
+  type augmentation. Co-locating these lets other modules
+  `import { router }` for imperative navigation later.
+
+This is also what triggers fast-refresh state preservation on theme /
+provider edits (the `react-refresh/only-export-components` rule
+expects route/App-level components to live in their own export-only
+modules).
 
 **Files:**
-- Modify: `src/main.tsx` (replace scaffolded content entirely)
+
+- Create: `src/router.ts`, `src/App.tsx`
+- Modify: `src/main.tsx` (replace scaffold content)
 
 ### Steps
 
-- [ ] **Step 1: Overwrite `src/main.tsx`**
+- [ ] **Step 1: Create `src/router.ts`**
 
-```tsx
-import { StrictMode } from "react";
-import { createRoot } from "react-dom/client";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { RouterProvider, createRouter } from "@tanstack/react-router";
-import { CssBaseline, ThemeProvider } from "@mui/material";
-import { lightTheme, darkTheme } from "./theme";
-import { useResolvedTheme } from "./lib/settings";
+```ts
+import { createRouter } from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";
 
-const queryClient = new QueryClient();
-const router = createRouter({ routeTree, defaultPreload: "intent" });
+export const router = createRouter({ routeTree, defaultPreload: "intent" });
 
 declare module "@tanstack/react-router" {
   interface Register {
     router: typeof router;
   }
 }
+```
 
-function ThemedApp() {
+- [ ] **Step 2: Create `src/App.tsx`**
+
+```tsx
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { RouterProvider } from "@tanstack/react-router";
+import { CssBaseline, ThemeProvider } from "@mui/material";
+import { lightTheme, darkTheme } from "./theme";
+import { useResolvedTheme } from "./lib/settings";
+import { router } from "./router";
+
+const queryClient = new QueryClient();
+
+export function App() {
   const mode = useResolvedTheme();
   return (
-    <ThemeProvider theme={mode === "dark" ? darkTheme : lightTheme}>
-      <CssBaseline />
-      <RouterProvider router={router} />
-    </ThemeProvider>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider theme={mode === "dark" ? darkTheme : lightTheme}>
+        <CssBaseline />
+        <RouterProvider router={router} />
+      </ThemeProvider>
+    </QueryClientProvider>
   );
 }
+```
+
+- [ ] **Step 3: Overwrite `src/main.tsx`**
+
+```tsx
+import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
+import { App } from "./App";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <ThemedApp />
-    </QueryClientProvider>
+    <App />
   </StrictMode>,
 );
 ```
 
-- [ ] **Step 2: Verify typecheck + lint**
+- [ ] **Step 4: Verify typecheck + lint**
 
 `src/routeTree.gen.ts` was generated in Task 0 step 14 (against stub
 routes), so the `import { routeTree } from "./routeTree.gen"` resolves.
@@ -1806,11 +1838,11 @@ npm run typecheck && npm run lint
 
 Expected: PASS.
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
-git add src/main.tsx
-git commit -m "feat: main.tsx wires QueryClient + Router + ThemeProvider"
+git add src/main.tsx src/App.tsx src/router.ts
+git commit -m "feat: bootstrap main + App + router (providers + RouterProvider)"
 ```
 
 ---

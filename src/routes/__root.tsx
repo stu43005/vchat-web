@@ -1,4 +1,3 @@
-/* eslint-disable react-refresh/only-export-components */
 import { Outlet, createRootRoute } from "@tanstack/react-router";
 import { Box } from "@mui/material";
 import { TopBar } from "../components/TopBar";
