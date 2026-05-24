@@ -57,6 +57,16 @@ export function ymdInTokyo(iso: string): string {
   return `${parts.year}${parts.month}${parts.day}`;
 }
 
+export function formatSuperAmount(row: {
+  currency: string;
+  amount: number;
+  jpyAmount: number;
+}): string {
+  return row.currency === "JPY"
+    ? formatCurrency(row.jpyAmount, "JPY")
+    : `${formatCurrency(row.amount, row.currency)} (${formatCurrency(row.jpyAmount, "JPY")})`;
+}
+
 export function legacyVideoHref(
   video: { id: string; availableAt: string },
   channel: { id: string },

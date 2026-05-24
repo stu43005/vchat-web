@@ -40,5 +40,10 @@ export function RowDispatcher({ row, no, video, timezone }: Props) {
       return <RaidRow row={row} no={no} video={video} timezone={timezone} />;
     case "raidOutgoing":
       return <RaidOutgoingRow row={row} no={no} video={video} timezone={timezone} />;
+    default: {
+      const _exhaustive: never = row;
+      void _exhaustive;
+      return null;
+    }
   }
 }

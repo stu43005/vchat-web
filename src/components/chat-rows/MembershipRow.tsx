@@ -2,6 +2,7 @@ import { Box } from "@mui/material";
 import type { ChatRowMembership, VideoMeta } from "../../api/types";
 import type { TimezonePref } from "../../lib/format";
 import { ChatRowBase } from "./ChatRowBase";
+import { MEMBERSHIP_GREEN } from "./constants";
 import { TimestampLink } from "./TimestampLink";
 
 interface Props {
@@ -20,7 +21,7 @@ export function MembershipRow({ row, no, video, timezone }: Props) {
       photo={row.authorPhoto}
       author={row.authorName ?? ""}
       body={
-        <Box sx={{ borderLeft: "4px solid #00984f", pl: 1 }}>
+        <Box sx={{ borderLeft: `4px solid ${MEMBERSHIP_GREEN}`, pl: 1 }}>
           Joined as a member ({label})
         </Box>
       }

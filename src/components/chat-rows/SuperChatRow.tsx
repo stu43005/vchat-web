@@ -1,7 +1,8 @@
 import { Box, Typography } from "@mui/material";
 import type { ChatRowSuperChat, VideoMeta } from "../../api/types";
-import { formatCurrency, type TimezonePref } from "../../lib/format";
+import { formatSuperAmount, type TimezonePref } from "../../lib/format";
 import { ChatRowBase } from "./ChatRowBase";
+import { ColorBadge } from "./ColorBadge";
 import { TimestampLink } from "./TimestampLink";
 
 interface Props {
@@ -12,10 +13,7 @@ interface Props {
 }
 
 export function SuperChatRow({ row, no, video, timezone }: Props) {
-  const amount =
-    row.currency === "JPY"
-      ? formatCurrency(row.jpyAmount, "JPY")
-      : `${formatCurrency(row.amount, row.currency)} (${formatCurrency(row.jpyAmount, "JPY")})`;
+  const amount = formatSuperAmount(row);
 
   return (
     <ChatRowBase
@@ -25,15 +23,7 @@ export function SuperChatRow({ row, no, video, timezone }: Props) {
       author={row.authorName ?? ""}
       body={
         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-          <Box
-            sx={{
-              width: 8,
-              minHeight: 24,
-              bgcolor: row.color ?? "transparent",
-              borderRadius: 0.5,
-              flexShrink: 0,
-            }}
-          />
+          <ColorBadge color={row.color ?? undefined} />
           <Typography variant="body2" sx={{ fontFamily: "monospace" }}>
             {amount}
           </Typography>

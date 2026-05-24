@@ -1,12 +1,13 @@
 import type { ChatRowChat, VideoMeta } from "../../api/types";
 import type { TimezonePref } from "../../lib/format";
 import { ChatRowBase } from "./ChatRowBase";
+import { MEMBERSHIP_GREEN, MODERATOR_BLUE, VERIFIED_GREY } from "./constants";
 import { TimestampLink } from "./TimestampLink";
 
 const AUTHOR_BORDER: Record<string, string> = {
-  owner: "#00984f",
-  moderator: "#5e84f1",
-  verified: "#888",
+  owner: MEMBERSHIP_GREEN,
+  moderator: MODERATOR_BLUE,
+  verified: VERIFIED_GREY,
 };
 
 interface Props {

@@ -17,7 +17,7 @@ export function RaidOutgoingRow({ row, no, video, timezone }: Props) {
       timestamp={<TimestampLink row={row} video={video} timezone={timezone} />}
       photo={row.originPhoto ?? null}
       author="Raid (outgoing)"
-      body={`Sending you to ${row.originName ?? ""}`}
+      body={`Sending you to ${row.originName ?? "unknown channel"}`}
     />
   );
 }
