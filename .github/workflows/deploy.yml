@@ -1,0 +1,50 @@
+name: Deploy SPA to S3
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run lint
+
+      - run: npm run typecheck
+
+      - run: npm run build
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Sync dist/ to S3 (excluding honeybee-owned /data)
+        run: |
+          aws s3 sync dist/ s3://${{ secrets.S3_BUCKET }}/ \
+            --delete \
+            --exclude "data/*"
+
+      - name: Invalidate CloudFront for SPA paths
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ secrets.CF_DIST_ID }} \
+            --paths "/index.html" "/assets/*"
