@@ -1,3 +1,4 @@
+import { memo } from "react";
 import type { ChatRow, VideoMeta } from "../../api/types";
 import type { TimezonePref } from "../../lib/format";
 import { ChatRow as ChatRowComponent } from "./ChatRow";
@@ -18,7 +19,7 @@ interface Props {
   timezone: TimezonePref;
 }
 
-export function RowDispatcher({ row, no, video, timezone }: Props) {
+function RowDispatcherImpl({ row, no, video, timezone }: Props) {
   switch (row.type) {
     case "chat":
       return <ChatRowComponent row={row} no={no} video={video} timezone={timezone} />;
@@ -47,3 +48,5 @@ export function RowDispatcher({ row, no, video, timezone }: Props) {
     }
   }
 }
+
+export const RowDispatcher = memo(RowDispatcherImpl);

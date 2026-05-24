@@ -29,3 +29,19 @@ Pushes to `main` trigger `.github/workflows/deploy.yml` which builds
 and syncs to S3 via OIDC, then invalidates CloudFront. Required
 secrets: `AWS_DEPLOY_ROLE_ARN`, `AWS_REGION`, `S3_BUCKET`,
 `CF_DIST_ID`.
+
+### S3 layout contract
+
+The deploy job runs `aws s3 sync dist/ s3://$BUCKET/ --delete --exclude "data/*"`.
+The bucket layout this assumes:
+
+- All SPA-owned files live at the bucket root (`index.html`, `favicon.svg`,
+  `icons.svg`, `assets/*`). `--delete` will remove any root-level object
+  not present in the new build.
+- The `/data` prefix is **owned by honeybee** (the upstream archiver).
+  The `--exclude "data/*"` pattern protects it — AWS CLI's `fnmatch`
+  semantics treat `*` as matching `/`, so the pattern covers nested
+  paths like `data/channels/<id>/index.json` as well.
+- Honeybee must never write outside `/data`. Adding new SPA top-level
+  prefixes is fine; adding new honeybee prefixes requires extending the
+  `--exclude` list in `deploy.yml`.

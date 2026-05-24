@@ -1,3 +1,4 @@
+import { Link } from "@mui/material";
 import type { ChatRow, VideoMeta } from "../../api/types";
 import { formatTimestamp, getYouTubeUrl, type TimezonePref } from "../../lib/format";
 
@@ -14,14 +15,15 @@ export function TimestampLink({ row, video, timezone }: TimestampLinkProps) {
       (Date.parse(row.timestamp) - Date.parse(video.actualStart)) / 1000,
     );
     return (
-      <a
+      <Link
         href={getYouTubeUrl(video.id, t)}
         target="_blank"
         rel="noopener noreferrer"
-        style={{ color: "inherit" }}
+        color="inherit"
+        underline="hover"
       >
         {display}
-      </a>
+      </Link>
     );
   }
   return <span>{display}</span>;

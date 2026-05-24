@@ -13,7 +13,7 @@ interface Props {
 }
 
 export function MembershipRow({ row, no, video, timezone }: Props) {
-  const label = row.level ?? row.membership ?? "N/A";
+  const label = row.level ?? row.membership ?? "unknown tier";
   return (
     <ChatRowBase
       no={no}

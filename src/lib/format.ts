@@ -17,19 +17,31 @@ export function formatCurrency(
   });
 }
 
+const timestampFormatters = new Map<TimezonePref, Intl.DateTimeFormat>();
+
+function getTimestampFormatter(timezone: TimezonePref): Intl.DateTimeFormat {
+  let fmt = timestampFormatters.get(timezone);
+  if (!fmt) {
+    fmt = new Intl.DateTimeFormat("en-US", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+      timeZone: timezone === "local" ? undefined : timezone,
+    });
+    timestampFormatters.set(timezone, fmt);
+  }
+  return fmt;
+}
+
 export function formatTimestamp(iso: string, timezone: TimezonePref): string {
-  const fmt = new Intl.DateTimeFormat("en-US", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-    timeZone: timezone === "local" ? undefined : timezone,
-  });
   const parts = Object.fromEntries(
-    fmt.formatToParts(new Date(iso)).map((p) => [p.type, p.value]),
+    getTimestampFormatter(timezone)
+      .formatToParts(new Date(iso))
+      .map((p) => [p.type, p.value]),
   );
   return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}:${parts.second}`;
 }

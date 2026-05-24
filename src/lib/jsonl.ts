@@ -1,32 +1,38 @@
-import type { ChatRow } from "../api/types";
+import { z } from "zod";
 import { warnOnce } from "./warn";
 
-const KNOWN_TYPES: ReadonlySet<ChatRow["type"]> = new Set([
-  "chat",
-  "superChat",
-  "superSticker",
-  "membership",
-  "membershipGift",
-  "membershipGiftPurchase",
-  "milestone",
-  "poll",
-  "raid",
-  "raidOutgoing",
-]);
+const rowTypeSchema = z.object({
+  type: z.enum([
+    "chat",
+    "superChat",
+    "superSticker",
+    "membership",
+    "membershipGift",
+    "membershipGiftPurchase",
+    "milestone",
+    "poll",
+    "raid",
+    "raidOutgoing",
+  ]),
+});
 
 export function parseJSONL<T>(text: string): T[] {
   const out: T[] = [];
   for (const line of text.split("\n")) {
     if (!line) continue;
-    const row = JSON.parse(line) as { type?: string };
-    if (
-      typeof row.type === "string" &&
-      !KNOWN_TYPES.has(row.type as ChatRow["type"])
-    ) {
-      warnOnce("unknown row type", row.type);
+    let raw: unknown;
+    try {
+      raw = JSON.parse(line);
+    } catch (err) {
+      warnOnce("malformed JSONL line", err instanceof Error ? err.message : String(err));
       continue;
     }
-    out.push(row as T);
+    const parsed = rowTypeSchema.safeParse(raw);
+    if (!parsed.success) {
+      warnOnce("invalid row type", parsed.error.issues[0]?.message ?? "unknown");
+      continue;
+    }
+    out.push(raw as T);
   }
   return out;
 }
