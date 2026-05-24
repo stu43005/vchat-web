@@ -41,6 +41,12 @@ export function ChatList(props: ChatListProps) {
     );
   }, [headerHeight]);
 
+  // useVirtualizer trips react-hooks/incompatible-library (the rule has a
+  // hardcoded incompatible-library list, no configurable allowlist).
+  // Suppression is what TanStack's own tanstack.com codebase does — see
+  // upstream issue TanStack/virtual#1119. Revisit once that is resolved
+  // or if this project ever opts into React Compiler.
+  // eslint-disable-next-line react-hooks/incompatible-library
   const virtualizer = useVirtualizer({
     count: filtered.length,
     getScrollElement: () => containerRef.current,
