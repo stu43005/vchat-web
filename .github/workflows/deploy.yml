@@ -37,14 +37,10 @@ jobs:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      # --dryrun is temporary: pending a one-time manual verification that
-      # --delete with the current exclude list does not touch honeybee's
-      # /data/* or /UC* prefixes. Remove --dryrun once verified.
       - name: Sync dist/ to S3 (excluding honeybee-owned prefixes)
         run: |
           aws s3 sync dist/ s3://${{ secrets.S3_BUCKET }}/ \
             --delete \
-            --dryrun \
             --exclude "data/*" \
             --exclude "UC*"
 

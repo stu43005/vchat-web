@@ -113,12 +113,6 @@ aws s3 sync dist/ s3://<bucket-name>/ \
   --exclude "UC*"
 ```
 
-> **目前 workflow 暫時加掛 `--dryrun`**（見
-> [.github/workflows/deploy.yml](../.github/workflows/deploy.yml)）。
-> 待首次手動觸發 workflow 並從 sync step log 確認「dryrun would delete」
-> 清單只列出真正該刪除的舊 SPA 資產、**未列出任何 `/data/*` 或 `/UC*`
-> 物件**後，再移除 `--dryrun` 行讓部署正式生效。
-
 說明：
 
 - **`--delete`**：sync 會移除目的端比來源端多的物件，讓 bucket root
@@ -328,8 +322,7 @@ Workflow 已用 `permissions: id-token: write` 啟用 OIDC；對應 AWS 端
   與 `--exclude "UC*"` 保證——IAM 層無法精細到「禁止寫入特定前綴」(\*)。
   若需要更強保護，可考慮 S3 Object Ownership + bucket policy `Deny`
   規則，但會增加維運複雜度。
-- `s3:DeleteObject` 為 `--delete` 旗標所需。若 workflow 改回無
-  `--delete` 模式（或改用 `--dryrun`），此權限不會被使用，但保留無害。
+- `s3:DeleteObject` 為 `--delete` 旗標所需。
 
 (\*) S3 `s3:PutObject` 條件 `s3:prefix` 只對 List 有效，對
 PutObject 無效。
@@ -394,13 +387,8 @@ PutObject 無效。
 ### 6.3 部署流程驗證
 
 1. 手動觸發一次 `workflow_dispatch` → 觀察各 step 綠燈。
-2. Sync step log 應顯示：
-   - 上傳的物件**不包含**任何 `data/` 或 `UC*` 開頭的路徑。
-   - 若 workflow 仍掛 `--dryrun`：log 會出現
-     `(dryrun) upload: …` 與 `(dryrun) delete: …` 行，**仔細檢視
-     `delete:` 清單**——應只列出舊版 SPA 資產（例如過時的
-     `assets/main-<old-hash>.js`），**絕不應**列出任何 `data/*`
-     或 `UC*` 物件。確認無誤後即可移除 workflow 中的 `--dryrun` 行。
+2. Sync step log：上傳與刪除的物件**不包含**任何 `data/` 或 `UC*`
+   開頭的路徑。
 3. Invalidation step log 應只列出 `/index.html` 與 `/assets/*`。
 4. AWS Console → S3 → bucket → `data/` 與 `UC*` 前綴存在且物件
    數量未變。
