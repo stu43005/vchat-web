@@ -212,7 +212,7 @@ Files to stage: `src/routes/videos.$videoId.tsx` and (if changed by `tsr generat
 Create `src/components/LegacyArchiveAlert.tsx` with exactly this content:
 
 ```tsx
-import { Alert, Box, Button, CircularProgress } from "@mui/material";
+import { Alert, Button, CircularProgress } from "@mui/material";
 import { useQuery } from "@tanstack/react-query";
 import { fetchHead } from "../api/client";
 
@@ -228,8 +228,8 @@ export function LegacyArchiveAlert({
   dateYmd,
 }: LegacyArchiveAlertProps) {
   const enabled = Boolean(channelId && dateYmd);
-  // Composed inline per spec §4.4: dateYmd is already YYYYMMDD, channelId is
-  // already the bare id, so a template literal is the canonical form.
+  // dateYmd is already YYYYMMDD and channelId is the bare id, so a template
+  // literal yields the legacy path directly.
   const legacyPath = enabled
     ? `/${channelId}/${dateYmd}_${videoId}.html`
     : "";
@@ -269,9 +269,9 @@ export function LegacyArchiveAlert({
     );
   }
 
-  // useQuery v5: when `enabled: false`, `isPending` is `true` with
-  // `fetchStatus: 'idle'`. We guard with `enabled &&` so the spinner only
-  // appears when the probe is actually running.
+  // When `enabled: false`, useQuery reports `isPending: true` with
+  // `fetchStatus: 'idle'`. Gate on `enabled` so the spinner only renders
+  // while a probe is actually in flight.
   const showSpinner = enabled && query.isPending;
 
   return (
@@ -281,8 +281,7 @@ export function LegacyArchiveAlert({
         This video has not yet been archived in the new format. If you have an
         older link, the legacy archive may be available.
         {showSpinner && (
-          <Box
-            component={CircularProgress}
+          <CircularProgress
             size={16}
             sx={{ ml: 1, verticalAlign: "middle" }}
           />
@@ -297,22 +296,12 @@ Why `<strong>` instead of `<AlertTitle>`: matches the existing inline alert at
 [videos.$videoId.tsx:69-74](../../src/routes/videos.$videoId.tsx#L69-L74) so the
 diff is minimal and the two warning-state alerts look identical to the user.
 
-Why the inline `CircularProgress`: the spinner is a visual cue inside the
-existing body text, not a standalone loader. Wrapping in `<Box component={...}>`
-is the project's idiomatic way (consistent with other MUI patterns in this
-repo) to attach `sx` to a non-MUI-typed prop chain without TypeScript
-complaints; equivalent to `<CircularProgress size={16} sx={{ ... }} />` if
-the typing allows. If the `<Box component={CircularProgress}>` form draws a
-type error, fall back to the direct form:
-
-```tsx
-{showSpinner && (
-  <CircularProgress
-    size={16}
-    sx={{ ml: 1, verticalAlign: "middle" }}
-  />
-)}
-```
+Why the direct `<CircularProgress size={16} sx={...} />` form: the spinner
+is a visual cue inside the existing body text, not a standalone loader. Both
+`size` and `sx` are native props on the MUI v9 `CircularProgress` component,
+so the direct form is the only sanctioned form. Do NOT wrap in `<Box
+component={CircularProgress}>` — that pattern is for promoting plain HTML
+tags into MUI styling, not for MUI components that already accept `sx`.
 
 - [ ] **Step 2: Run typecheck**
 
