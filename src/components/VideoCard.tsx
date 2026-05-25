@@ -7,7 +7,7 @@ import type {
 import {
   formatCurrency,
   getYouTubeThumbnail,
-  legacyVideoHref,
+  ymdInTokyo,
 } from "../lib/format";
 import { useTimezonePref } from "../lib/settings";
 import { RouterAnchor } from "../lib/createMuiLink";
@@ -39,11 +39,13 @@ export function VideoCard({ video, channel, hideChannel = false }: VideoCardProp
   } as const;
 
   const cardLink = isLegacy ? (
-    <Box
-      component="a"
-      href={legacyVideoHref(video, channel)}
-      target="_blank"
-      rel="noopener noreferrer"
+    <RouterAnchor
+      to="/videos/$videoId"
+      params={{ videoId: video.id }}
+      search={{
+        c: channel.id,
+        d: ymdInTokyo(video.availableAt),
+      }}
       aria-label={video.title}
       sx={overlayLinkSx}
     />
