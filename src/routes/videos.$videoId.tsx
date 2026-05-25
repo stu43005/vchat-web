@@ -17,6 +17,7 @@ import { ChatList } from "../components/ChatList";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
 import { useTimezonePref } from "../lib/settings";
 import type { FilterableType } from "../api/types";
+import { LegacyArchiveAlert } from "../components/LegacyArchiveAlert";
 
 const filterableTypeEnum = z.enum([
   "chat",
@@ -73,13 +74,11 @@ function VideoPage() {
     if (meta.error instanceof NotFoundError) {
       return (
         <Container sx={{ py: 2 }}>
-          <Alert severity="warning" sx={{ maxWidth: 640 }}>
-            <strong>Archive not yet available</strong>
-            <div>
-              This video has not yet been archived in the new format. If you have
-              an older link, the legacy archive may be available.
-            </div>
-          </Alert>
+          <LegacyArchiveAlert
+            videoId={videoId}
+            channelId={search.c}
+            dateYmd={search.d}
+          />
         </Container>
       );
     }
