@@ -34,7 +34,7 @@ when the file is present.
   owns the "video not in the new archive" UX, and a separate route
   would just duplicate the surface.
 - Changing the legacy HTML path scheme owned by honeybee
-  (`/{channelId}/{YYYY-MM-DD}_{videoId}.html`).
+  (`/{channelId}/{YYYYMMDD}_{videoId}.html`).
 - Direct visits to `/videos/$videoId` without the `c`/`d` hint do not
   perform a HEAD probe — there is no way to construct the URL without
   channel id + date, and fetching `channel.json` just to attempt a
@@ -52,7 +52,7 @@ The `/videos/$videoId` route's search schema gains two optional fields:
 | Param | Type     | Meaning                                                                                    |
 | ----- | -------- | ------------------------------------------------------------------------------------------ |
 | `c`   | `string` | Channel id. Free-form opaque id, no length cap enforced.                                   |
-| `d`   | `string` | 8-digit `YYYYMMDD` in Asia/Tokyo. Identical to what `ymdInTokyo` already returns and what `legacyVideoHref` puts into the legacy HTML path — no transformation needed in either direction. |
+| `d`   | `string` | 8-digit `YYYYMMDD` in Asia/Tokyo, identical to what `ymdInTokyo` returns — no transformation needed in either direction. |
 
 Both default to `undefined`. They are decorative — neither affects the
 success path of loading `videoMeta` or `rows`. They are read only inside
