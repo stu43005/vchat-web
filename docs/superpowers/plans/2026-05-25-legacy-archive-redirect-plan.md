@@ -46,41 +46,7 @@ Tasks 1, 2, 3 are independent and can be executed in any order; the listed seque
 **Files:**
 - Modify: `src/api/client.ts` (append a new exported function after `fetchJsonl`)
 
-- [ ] **Step 1: Read the current file**
-
-Run: `cat src/api/client.ts`
-
-Expected content (for orientation):
-
-```ts
-import { parseJSONL } from "../lib/jsonl";
-
-const DATA_BASE = (import.meta.env.VITE_DATA_BASE as string | undefined) ?? "/data";
-
-export class NotFoundError extends Error {
-  constructor(public readonly path: string) {
-    super(`not found: ${path}`);
-    this.name = "NotFoundError";
-  }
-}
-
-export async function fetchJson<T>(path: string): Promise<T> {
-  const res = await fetch(`${DATA_BASE}${path}`, { cache: "default" });
-  if (res.status === 404) throw new NotFoundError(path);
-  if (!res.ok) throw new Error(`fetch ${path}: ${res.status}`);
-  return (await res.json()) as T;
-}
-
-export async function fetchJsonl<T>(path: string): Promise<T[]> {
-  const res = await fetch(`${DATA_BASE}${path}`, { cache: "default" });
-  if (res.status === 404) throw new NotFoundError(path);
-  if (!res.ok) throw new Error(`fetch ${path}: ${res.status}`);
-  const text = await res.text();
-  return parseJSONL<T>(text);
-}
-```
-
-- [ ] **Step 2: Append the `fetchHead` helper**
+- [ ] **Step 1: Append the `fetchHead` helper**
 
 Append exactly this block to the bottom of `src/api/client.ts`:
 
@@ -99,17 +65,17 @@ Behavior notes (do not write these as code comments — they belong in the spec)
 - Non-2xx (including 404) resolves to `false` because `res.ok === false`. `fetch` does not reject on non-2xx per WHATWG.
 - Network failures (DNS error, offline, CORS preflight failure) reject the `fetch` promise; the rejection propagates so callers (`useQuery`) see an error state.
 
-- [ ] **Step 3: Run typecheck**
+- [ ] **Step 2: Run typecheck**
 
 Run: `npm run typecheck`
 Expected: exits 0, no errors.
 
-- [ ] **Step 4: Run lint**
+- [ ] **Step 3: Run lint**
 
 Run: `npm run lint`
 Expected: exits 0, no errors.
 
-- [ ] **Step 5: Commit via `git-master` skill**
+- [ ] **Step 4: Commit via `git-master` skill**
 
 Invoke the `git-master` skill with this commit message and file:
 
@@ -126,37 +92,9 @@ Files to stage: `src/api/client.ts` (explicit path, do not use `git add -A`).
 **Files:**
 - Modify: `src/routes/videos.$videoId.tsx` (extend `videoSearchSchema` at lines 33-39 only — do NOT touch the meta-404 render branch yet; that is Task 4)
 
-- [ ] **Step 1: Read the current schema**
+- [ ] **Step 1: Add `c` and `d` fields with silent-fallback behavior**
 
-Run: `sed -n '21,44p' src/routes/videos.$videoId.tsx`
-
-Expected output includes:
-
-```ts
-const filterableTypeEnum = z.enum([
-  "chat",
-  "superChat",
-  "superSticker",
-  "membership",
-  "membershipGift",
-  "membershipGiftPurchase",
-  "milestone",
-  "poll",
-  "raid",
-]);
-
-const videoSearchSchema = z.object({
-  types: z.array(filterableTypeEnum).optional(),
-  sigRange: z
-    .tuple([z.number().int().min(1).max(7), z.number().int().min(1).max(7)])
-    .refine(([lo, hi]) => lo <= hi, { message: "lo must be <= hi" })
-    .optional(),
-});
-```
-
-- [ ] **Step 2: Add `c` and `d` fields with silent-fallback behavior**
-
-Edit `videoSearchSchema` to add two new fields:
+Edit the existing `videoSearchSchema` in `src/routes/videos.$videoId.tsx` to add two new fields. After the edit, the schema must read exactly:
 
 ```ts
 const videoSearchSchema = z.object({
@@ -180,17 +118,17 @@ Rationale for `.catch(undefined)`:
 
 No other code in the route changes in this task (the meta-404 render branch is rewritten in Task 4; existing `replace: true` navigations in `FilterChips` already spread `...search`, so `c`/`d` survive automatically — no edits needed there).
 
-- [ ] **Step 3: Run typecheck**
+- [ ] **Step 2: Run typecheck**
 
 Run: `npm run typecheck`
 Expected: exits 0, no errors. (TanStack Router will regenerate `src/routeTree.gen.ts` and pick up the new optional fields.)
 
-- [ ] **Step 4: Run lint**
+- [ ] **Step 3: Run lint**
 
 Run: `npm run lint`
 Expected: exits 0, no errors.
 
-- [ ] **Step 5: Commit via `git-master` skill**
+- [ ] **Step 4: Commit via `git-master` skill**
 
 Commit message:
 
@@ -332,36 +270,7 @@ Files to stage: `src/components/LegacyArchiveAlert.tsx`.
 
 **Depends on:** Task 2 (`c`/`d` in search schema) and Task 3 (`LegacyArchiveAlert` exists).
 
-- [ ] **Step 1: Read the current meta-404 branch**
-
-Run: `sed -n '60,93p' src/routes/videos.$videoId.tsx`
-
-Expected output includes:
-
-```tsx
-  // Meta error takes precedence (so a 404 surfaces "Archive not yet
-  // available" immediately rather than after a skeleton flash).
-  if (meta.isError) {
-    if (meta.error instanceof NotFoundError) {
-      return (
-        <Container sx={{ py: 2 }}>
-          <Alert severity="warning" sx={{ maxWidth: 640 }}>
-            <strong>Archive not yet available</strong>
-            <div>
-              This video has not yet been archived in the new format. If you have
-              an older link, the legacy archive may be available.
-            </div>
-          </Alert>
-        </Container>
-      );
-    }
-    return (
-      ...
-    );
-  }
-```
-
-- [ ] **Step 2: Add the import for `LegacyArchiveAlert`**
+- [ ] **Step 1: Add the import for `LegacyArchiveAlert`**
 
 Add to the import block at the top of `src/routes/videos.$videoId.tsx` (alphabetical order within the existing component imports):
 
@@ -369,50 +278,35 @@ Add to the import block at the top of `src/routes/videos.$videoId.tsx` (alphabet
 import { LegacyArchiveAlert } from "../components/LegacyArchiveAlert";
 ```
 
-- [ ] **Step 3: Replace the inline `Alert` with `<LegacyArchiveAlert>`**
+- [ ] **Step 2: Replace the inline `Alert` with `<LegacyArchiveAlert>`**
 
-Edit the meta-404 branch so it reads:
+In the `meta.isError` → `meta.error instanceof NotFoundError` branch, replace the inline `<Alert severity="warning" sx={{ maxWidth: 640 }}>…</Alert>` (the one with title "Archive not yet available") with:
 
 ```tsx
-  if (meta.isError) {
-    if (meta.error instanceof NotFoundError) {
-      return (
-        <Container sx={{ py: 2 }}>
-          <LegacyArchiveAlert
-            videoId={videoId}
-            channelId={search.c}
-            dateYmd={search.d}
-          />
-        </Container>
-      );
-    }
-    return (
-      ...
-    );
-  }
+<LegacyArchiveAlert
+  videoId={videoId}
+  channelId={search.c}
+  dateYmd={search.d}
+/>
 ```
 
-Keep the `<Container sx={{ py: 2 }}>` wrapper (per spec §4.3). Do not touch the non-404 error branch below it.
+Keep the surrounding `<Container sx={{ py: 2 }}>` wrapper. Do not touch the non-404 error branch (the one with the Retry button and `<Alert severity="error">`).
 
-- [ ] **Step 4: Remove now-unused `Alert` import (if applicable)**
+- [ ] **Step 3: Verify `Alert` import is still needed**
 
-If `Alert` is no longer used anywhere else in `src/routes/videos.$videoId.tsx`, remove it from the `@mui/material` import. If it IS still used by the non-404 error branch, leave it.
+The non-404 error branch still uses `<Alert severity="error">`, so the `Alert` import from `@mui/material` must stay. Do NOT remove it.
 
-Check via: `grep -n "Alert" src/routes/videos.$videoId.tsx`
-
-Expected: at least one remaining usage (the non-404 error branch around line 81 uses `<Alert severity="error">`). Therefore, keep the `Alert` import.
-
-- [ ] **Step 5: Run typecheck**
+- [ ] **Step 4: Run typecheck**
 
 Run: `npm run typecheck`
 Expected: exits 0, no errors.
 
-- [ ] **Step 6: Run lint**
+- [ ] **Step 5: Run lint**
 
 Run: `npm run lint`
 Expected: exits 0, no errors.
 
-- [ ] **Step 7: Commit via `git-master` skill**
+- [ ] **Step 6: Commit via `git-master` skill**
 
 Commit message:
 
@@ -431,57 +325,7 @@ Files to stage: `src/routes/videos.$videoId.tsx`.
 
 **Depends on:** Task 2 (`c`/`d` accepted by route schema).
 
-- [ ] **Step 1: Read the current cardLink construction**
-
-Run: `sed -n '1,58p' src/components/VideoCard.tsx`
-
-Expected current shape:
-
-```tsx
-import { Avatar, Box, Card, CardContent, Chip, Stack, Typography } from "@mui/material";
-import type {
-  ChannelRef,
-  VideoSummary,
-  VideoSummaryWithoutChannel,
-} from "../api/types";
-import {
-  formatCurrency,
-  getYouTubeThumbnail,
-  legacyVideoHref,
-} from "../lib/format";
-import { useTimezonePref } from "../lib/settings";
-import { RouterAnchor } from "../lib/createMuiLink";
-import { StatusText } from "./StatusText";
-
-interface VideoCardProps { ... }
-
-export function VideoCard({ video, channel, hideChannel = false }: VideoCardProps) {
-  const [timezone] = useTimezonePref();
-  const isLegacy = video.archiveVersion < 2;
-  const thumbnailSrc = getYouTubeThumbnail(video.id);
-
-  // ... overlayLinkSx ...
-
-  const cardLink = isLegacy ? (
-    <Box
-      component="a"
-      href={legacyVideoHref(video, channel)}
-      target="_blank"
-      rel="noopener noreferrer"
-      aria-label={video.title}
-      sx={overlayLinkSx}
-    />
-  ) : (
-    <RouterAnchor
-      to="/videos/$videoId"
-      params={{ videoId: video.id }}
-      aria-label={video.title}
-      sx={overlayLinkSx}
-    />
-  );
-```
-
-- [ ] **Step 2: Swap the import for `legacyVideoHref` to `ymdInTokyo`**
+- [ ] **Step 1: Swap the import for `legacyVideoHref` to `ymdInTokyo`**
 
 Change the import block to drop `legacyVideoHref` and add `ymdInTokyo`:
 
@@ -494,11 +338,11 @@ import {
 ```
 
 (`ymdInTokyo` is needed to compute the `d` search-param value from
-`video.availableAt`. It is already exported from `src/lib/format.ts:59-70`.)
+`video.availableAt`. It is already exported from `src/lib/format.ts`.)
 
-- [ ] **Step 3: Rewrite `cardLink` to always use `RouterAnchor`, passing `search` only when legacy**
+- [ ] **Step 2: Rewrite `cardLink` to always use `RouterAnchor`, passing `search` only when legacy**
 
-Replace the `cardLink` declaration with:
+Replace the current `cardLink` ternary (which uses `<Box component="a" href={legacyVideoHref(...)} target="_blank">` for the legacy branch) with:
 
 ```tsx
   const cardLink = isLegacy ? (
@@ -527,26 +371,26 @@ Two branches kept (instead of a single `RouterAnchor` with conditional `search` 
 2. The non-legacy branch must produce a clean URL with no extra query string — omitting the prop is the cleanest way.
 
 Do NOT change:
-- the `isLegacy` calculation (line 24)
-- the `Chip label="Legacy"` overlay (lines 80-87) — it stays as the user-visible signal
+- the `isLegacy` calculation
+- the `Chip label="Legacy"` overlay — it stays as the user-visible signal
 - the channel link, the thumbnail, the card body, the SC/Members/Gifts stack
 
-- [ ] **Step 4: Verify no other references to `legacyVideoHref` remain in this file**
+- [ ] **Step 3: Verify no other references to `legacyVideoHref` remain in this file**
 
 Run: `grep -n "legacyVideoHref" src/components/VideoCard.tsx`
 Expected: no matches.
 
-- [ ] **Step 5: Run typecheck**
+- [ ] **Step 4: Run typecheck**
 
 Run: `npm run typecheck`
 Expected: exits 0, no errors.
 
-- [ ] **Step 6: Run lint**
+- [ ] **Step 5: Run lint**
 
 Run: `npm run lint`
 Expected: exits 0, no errors.
 
-- [ ] **Step 7: Commit via `git-master` skill**
+- [ ] **Step 6: Commit via `git-master` skill**
 
 Commit message:
 
@@ -576,40 +420,23 @@ Expected matches:
 
 There MUST NOT be any remaining `import { legacyVideoHref }` or `legacyVideoHref(` call site in `src/`. If there is, stop and resolve it before deleting.
 
-- [ ] **Step 2: Read the current tail of format.ts**
+- [ ] **Step 2: Delete the `legacyVideoHref` export**
 
-Run: `sed -n '75,90p' src/lib/format.ts`
+Remove the entire `export function legacyVideoHref(video, channel): string { ... }` block from `src/lib/format.ts`. After the deletion, the file should end with its other exports plus a single trailing newline.
 
-Expected:
+Do NOT touch `ymdInTokyo` — VideoCard now imports it directly (Task 5).
 
-```ts
-}
-
-export function legacyVideoHref(
-  video: { id: string; availableAt: string },
-  channel: { id: string },
-): string {
-  return `/${channel.id}/${ymdInTokyo(video.availableAt)}_${video.id}.html`;
-}
-```
-
-- [ ] **Step 3: Delete the `legacyVideoHref` export**
-
-Remove lines 82-87 (the entire `export function legacyVideoHref(...) { ... }` block plus the blank line preceding it if it leaves a trailing-newline issue). The file should end after `formatSuperAmount` (or whatever the immediately preceding declaration is) plus a single trailing newline.
-
-Do NOT touch `ymdInTokyo` (lines 59-70) — VideoCard now imports it directly (Task 5).
-
-- [ ] **Step 4: Run typecheck**
+- [ ] **Step 3: Run typecheck**
 
 Run: `npm run typecheck`
 Expected: exits 0, no errors. (If there is still a caller, TypeScript will fail here — go back to Step 1.)
 
-- [ ] **Step 5: Run lint**
+- [ ] **Step 4: Run lint**
 
 Run: `npm run lint`
 Expected: exits 0, no errors.
 
-- [ ] **Step 6: Commit via `git-master` skill**
+- [ ] **Step 5: Commit via `git-master` skill**
 
 Commit message:
 
