@@ -36,6 +36,7 @@ const videoSearchSchema = z.object({
     .tuple([z.number().int().min(1).max(7), z.number().int().min(1).max(7)])
     .refine(([lo, hi]) => lo <= hi, { message: "lo must be <= hi" })
     .optional(),
+  // Legacy redirect hints (channelId + YYYYMMDD). `.catch(undefined)` so a stale URL stays navigable.
   c: z.string().min(1).optional().catch(undefined),
   d: z
     .string()
