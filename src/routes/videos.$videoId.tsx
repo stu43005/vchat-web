@@ -36,6 +36,12 @@ const videoSearchSchema = z.object({
     .tuple([z.number().int().min(1).max(7), z.number().int().min(1).max(7)])
     .refine(([lo, hi]) => lo <= hi, { message: "lo must be <= hi" })
     .optional(),
+  c: z.string().min(1).optional().catch(undefined),
+  d: z
+    .string()
+    .regex(/^\d{8}$/)
+    .optional()
+    .catch(undefined),
 });
 
 export const Route = createFileRoute("/videos/$videoId")({
