@@ -7,10 +7,11 @@ with code in this repository.
 
 `vchat-web` is a React 19 SPA that renders YouTube live-chat archives
 produced by the upstream **honeybee** archiver. It replaces honeybee's
-previous static-HTML output. The SPA loads `index.json`, per-channel
-`channel.json`, per-video `videoMeta.json`, and per-video `rows.jsonl`
-from the same origin under `/data/…` and renders three views: index
-list, channel page, video page.
+previous static-HTML output. The SPA loads `/data/index.json`,
+per-channel `/data/channels/<id>.json`, per-video
+`/data/videos/<id>.meta.json`, and per-video `/data/videos/<id>.jsonl`
+from the same origin and renders three views: index list, channel
+page, video page.
 
 Full design and implementation history live in
 [docs/superpowers/specs/](docs/superpowers/specs/) and
@@ -43,11 +44,11 @@ disabled with a warning — see `vite.config.ts`).
 ### Data ownership boundary
 
 The SPA never writes data. **Honeybee owns the `/data/` prefix on S3**;
-the SPA owns everything else at the bucket root. The deploy workflow's
-`aws s3 sync --delete --exclude "data/*"` enforces this. New SPA
-top-level prefixes are fine; new honeybee prefixes require extending
-the exclude list in `.github/workflows/deploy.yml`. See
-[README.md](README.md) §"S3 layout contract".
+the SPA owns everything else at the bucket root. This boundary is
+enforced by [.github/workflows/deploy.yml](.github/workflows/deploy.yml).
+New SPA top-level prefixes are fine; new honeybee prefixes require
+extending the exclude list in that workflow. See [README.md](README.md)
+§"S3 layout contract".
 
 ### Routing (TanStack Router, file-based)
 
