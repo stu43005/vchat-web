@@ -202,7 +202,7 @@ Add to [src/api/client.ts](../../../src/api/client.ts):
 
 ```ts
 export async function fetchHead(path: string): Promise<boolean> {
-  // path is an origin-rooted absolute path (e.g. "/UCxxxx/2024-01-01_abc.html").
+  // path is an origin-rooted absolute path (e.g. "/UCxxxx/20240101_abc.html").
   // Unlike fetchJson / fetchJsonl, this does NOT prepend DATA_BASE — legacy
   // HTML lives at the bucket root, not under /data/.
   const res = await fetch(path, { method: "HEAD", cache: "default" });
