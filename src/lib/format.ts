@@ -79,9 +79,3 @@ export function formatSuperAmount(row: {
     : `${formatCurrency(row.amount, row.currency)} (${formatCurrency(row.jpyAmount, "JPY")})`;
 }
 
-export function legacyVideoHref(
-  video: { id: string; availableAt: string },
-  channel: { id: string },
-): string {
-  return `/${channel.id}/${ymdInTokyo(video.availableAt)}_${video.id}.html`;
-}
