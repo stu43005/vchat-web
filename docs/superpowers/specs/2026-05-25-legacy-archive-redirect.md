@@ -49,19 +49,18 @@ when the file is present.
 
 The `/videos/$videoId` route's search schema gains two optional fields:
 
-| Param | Type     | Meaning                                                           |
-| ----- | -------- | ----------------------------------------------------------------- |
-| `c`   | `string` | Channel id. Free-form opaque id, no length cap enforced.          |
-| `d`   | `string` | `YYYY-MM-DD` in Asia/Tokyo, matching the legacy HTML path date.   |
+| Param | Type     | Meaning                                                                                    |
+| ----- | -------- | ------------------------------------------------------------------------------------------ |
+| `c`   | `string` | Channel id. Free-form opaque id, no length cap enforced.                                   |
+| `d`   | `string` | 8-digit `YYYYMMDD` in Asia/Tokyo. Identical to what `ymdInTokyo` already returns and what `legacyVideoHref` puts into the legacy HTML path — no transformation needed in either direction. |
 
 Both default to `undefined`. They are decorative — neither affects the
 success path of loading `videoMeta` or `rows`. They are read only inside
 the `meta.error instanceof NotFoundError` branch (see §4).
 
-The `d` value MUST match `^\d{4}-\d{2}-\d{2}$`; zod rejects malformed
-input and the rejected params are dropped silently (treated as absent).
-The `c` value MUST be a non-empty string; any empty string is also
-dropped.
+The `d` value MUST match `^\d{8}$`; zod rejects malformed input and the
+rejected params are dropped silently (treated as absent). The `c`
+value MUST be a non-empty string; any empty string is also dropped.
 
 The new params slot alongside the existing `types` and `sigRange`
 fields in `videoSearchSchema` at
@@ -90,9 +89,10 @@ After:
   ([VideoCard.tsx:80-87](../../../src/components/VideoCard.tsx#L80-L87))
   is unchanged.
 - The `legacyVideoHref` import is dropped from
-  [VideoCard.tsx](../../../src/components/VideoCard.tsx); the helper
-  itself stays exported from `lib/format.ts` because the new alert
-  component uses it.
+  [VideoCard.tsx](../../../src/components/VideoCard.tsx). After this
+  change VideoCard is the helper's only caller, so the helper itself
+  is also deleted from
+  [lib/format.ts](../../../src/lib/format.ts) — see §6.
 
 UX consequences:
 
@@ -110,11 +110,7 @@ UX consequences:
 
 Replace the inline `Alert` at
 [videos.$videoId.tsx:65-78](../../../src/routes/videos.$videoId.tsx#L65-L78)
-with a new component:
-
-```
-src/components/LegacyArchiveAlert.tsx
-```
+with a new component at `src/components/LegacyArchiveAlert.tsx`.
 
 ### 4.1 Props
 
@@ -138,7 +134,7 @@ Use `useQuery` from `@tanstack/react-query`:
 
 - `queryKey: ['legacyHead', videoId, channelId, dateYmd]`
 - `enabled: Boolean(channelId && dateYmd)`
-- `queryFn`: builds the legacy path via `legacyVideoHref({ id: videoId, availableAt: ... }, { id: channelId })` (or directly composes the path; see §4.4 implementation note), then calls `fetchHead(path)` and returns its boolean result.
+- `queryFn`: composes the legacy path inline (see §4.4) and calls `fetchHead(path)`, returning its boolean result.
 - `retry: false` — a single attempt is sufficient; we do not want exponential backoff for an inherently-may-not-exist resource.
 - `staleTime: Infinity` — the legacy HTML is immutable for a given
   `(channelId, date, videoId)` tuple. Honeybee never republishes legacy
@@ -157,6 +153,15 @@ The component always renders inside the existing `<Container sx={{ py: 2 }}>` wr
 | `enabled` and `query.isError`                                   | `warning` | "Archive not yet available" | Existing copy, no spinner.                                                                        | none                                                                                   |
 | `enabled` and `query.data === false`                            | `warning` | "Archive not yet available" | Existing copy, no spinner.                                                                        | none                                                                                   |
 
+The "Action button" column refers exclusively to the MUI `Alert`
+`action` prop (`<Alert action={<Button …/>}>…</Alert>`), **not** an
+inline child of `<Alert>`. The `action` slot right-aligns the button
+next to the alert title, matching the existing error-state retry
+button at
+[videos.$videoId.tsx:81-91](../../../src/routes/videos.$videoId.tsx#L81-L91).
+For rows whose Action-button cell says "none", omit the `action` prop
+entirely.
+
 The "Existing copy" string is the current message at
 [videos.$videoId.tsx:69-74](../../../src/routes/videos.$videoId.tsx#L69-L74):
 
@@ -173,20 +178,21 @@ Both copies are plain MUI `Alert` children; no i18n today.
 
 ### 4.4 Implementation note
 
-The legacy URL is constructed as `/{channelId}/{dateYmd}_{videoId}.html` —
-identical to what `legacyVideoHref` produces. The component MAY call
-`legacyVideoHref({ id: videoId, availableAt: ... }, { id: channelId })`
-by re-serializing dateYmd back through `ymdInTokyo`, but the simpler
-and equivalent option is to compose the path inline since both
-`channelId` and `dateYmd` arrive pre-formatted from the URL:
+The legacy URL is composed inline — both `channelId` and `dateYmd`
+arrive pre-formatted from the URL search params, so no helper call is
+needed:
 
 ```ts
 const legacyPath = `/${channelId}/${dateYmd}_${videoId}.html`;
 ```
 
-The plan should pick one of these two equivalent forms and stick to
-it. Either is fine; inline composition is preferred to avoid threading
-a fake `availableAt` value through `legacyVideoHref`.
+This is the only sanctioned form. The implementer MUST NOT call
+`legacyVideoHref` here: that helper takes an ISO `availableAt` and
+re-derives the date via `ymdInTokyo`, but at this point we only have
+the already-formatted `dateYmd` string. Synthesising a fake ISO
+timestamp just to round-trip it through the helper would be both
+fragile (timezone edge cases) and pointless (the inline template is
+the shorter form of what the helper does anyway).
 
 ---
 
@@ -206,12 +212,16 @@ export async function fetchHead(path: string): Promise<boolean> {
 
 Notes:
 
-- The helper returns `boolean` and never throws on HTTP status — both
-  404 and network errors short-circuit `fetch` to a rejected promise
-  for network failures and a non-`ok` response for 404. The 404 case
-  produces `false`; network errors propagate so `useQuery` enters its
-  error state (which the component treats identically to `false`).
-- No `DATA_BASE` prefix; the legacy HTML lives at the origin root.
+- A 404 (or any non-2xx) makes `res.ok === false`, so `fetchHead`
+  resolves to `false` — `fetch` does not reject on non-2xx responses
+  per the WHATWG spec, matching the pattern already used in
+  [fetchJson at client.ts:13-14](../../../src/api/client.ts#L13-L14).
+  Network failures (DNS error, offline, CORS preflight failure) reject
+  the underlying `fetch` promise; `fetchHead` lets the rejection
+  propagate so `useQuery` enters its error state, which §4.3 treats
+  identically to a `false` result.
+- No `DATA_BASE` prefix; the legacy HTML lives at the origin root,
+  unlike `fetchJson`/`fetchJsonl` whose targets sit under `/data/`.
 - `cache: "default"` matches the other helpers — the browser HTTP
   cache may serve a previous HEAD without hitting the network.
 
@@ -225,7 +235,7 @@ Notes:
 | `src/components/VideoCard.tsx`         | Drop the `<a target="_blank">` legacy branch; always use `RouterAnchor`; emit `search: { c, d }` when `isLegacy`.            |
 | `src/components/LegacyArchiveAlert.tsx` | New file. See §4.                                                                                                            |
 | `src/api/client.ts`                    | Add `fetchHead`.                                                                                                              |
-| `src/lib/format.ts`                    | No change. `legacyVideoHref` stays exported (used by anyone who still wants a direct legacy URL).                              |
+| `src/lib/format.ts`                    | Delete the now-unused `legacyVideoHref` export. `ymdInTokyo` stays — it is still called from VideoCard (§3) to build the `d` search-param value. |
 
 No changes to `src/api/types.ts`, the queries layer, or routing
 generation beyond what `tsr generate` produces from the updated route
