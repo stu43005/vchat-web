@@ -42,6 +42,9 @@ export function useVideoMetaQuery(
     staleTime: 5 * 60_000,
     gcTime: 30 * 60_000,
     retry: retryOnNon404,
+    // Archives are immutable; window-focus refetch on an errored (404)
+    // query would reset status to 'pending' and flash the Skeleton.
+    refetchOnWindowFocus: false,
     enabled: Boolean(videoId),
   });
 }
@@ -55,6 +58,7 @@ export function useVideoRowsQuery(
     staleTime: 5 * 60_000,
     gcTime: 30 * 60_000,
     retry: retryOnNon404,
+    refetchOnWindowFocus: false,
     enabled: Boolean(videoId),
   });
 }
