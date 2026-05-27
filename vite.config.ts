@@ -27,6 +27,10 @@ export default defineConfig(({ mode }) => {
               target: proxyTarget,
               changeOrigin: true,
             },
+            "^/UC[^/]+/": {
+              target: proxyTarget,
+              changeOrigin: true,
+            },
           }
         : undefined,
     },
