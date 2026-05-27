@@ -32,7 +32,6 @@ export function LegacyArchiveAlert({
     return (
       <Alert
         severity="info"
-        sx={{ maxWidth: 640 }}
         action={
           <Button
             variant="outlined"
@@ -61,18 +60,14 @@ export function LegacyArchiveAlert({
   const showSpinner = enabled && query.isPending;
 
   return (
-    <Alert severity="warning" sx={{ maxWidth: 640 }}>
-      <strong>Archive not yet available</strong>
-      <div>
-        This video has not yet been archived in the new format. If you have an
-        older link, the legacy archive may be available.
-        {showSpinner && (
-          <CircularProgress
-            size={16}
-            sx={{ ml: 1, verticalAlign: "middle" }}
-          />
-        )}
-      </div>
+    <Alert severity="warning">
+      This video has not yet been archived.
+      {showSpinner && (
+        <CircularProgress
+          size={16}
+          sx={{ ml: 1, verticalAlign: "middle" }}
+        />
+      )}
     </Alert>
   );
 }
