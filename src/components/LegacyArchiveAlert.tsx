@@ -60,14 +60,13 @@ export function LegacyArchiveAlert({
   const showSpinner = enabled && query.isPending;
 
   return (
-    <Alert severity="warning">
+    <Alert
+      severity="warning"
+      action={
+        showSpinner ? <CircularProgress size={16} sx={{ m: 1 }} /> : null
+      }
+    >
       This video has not yet been archived.
-      {showSpinner && (
-        <CircularProgress
-          size={16}
-          sx={{ ml: 1, verticalAlign: "middle" }}
-        />
-      )}
     </Alert>
   );
 }
