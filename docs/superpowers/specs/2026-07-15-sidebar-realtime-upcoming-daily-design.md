@@ -101,6 +101,24 @@ YouTube-style badge overlaid on the video-card thumbnail (§7.2).
     absence ⇒ v1), so a version check would be inert now. The reader
     parses the v1 shape and ignores unknown fields (forward
     compatibility), matching how the app already reads its other JSON.
+- **`/daily/today` is not auto-corrected across a JST midnight rollover
+  while the page sits idle.**
+  - **Concern (reviewer):** a user who loaded a clean today result before
+    JST midnight and leaves the page open across the boundary keeps
+    seeing the previous JST day under the `/daily/today` URL (and the two
+    "Top … Today" sidebar entries), because there is no polling and the
+    result is not a fallback (`isFallback === false`), so nothing triggers
+    a re-render or refetch while idle.
+  - **Decision:** not implemented (no midnight timer / invalidation).
+  - **Rationale:** consistent with the app-wide no-polling stance already
+    accepted for `realtime.json` (whose live viewer counts — a far more
+    dynamic value — likewise do not auto-update), and the scenario
+    (sitting idle on a daily-rankings page across JST midnight) is
+    low-probability. The view self-corrects on the next interaction
+    (navigation or manual refresh). The narrower **404-fallback** case is
+    still handled actively (result-dependent `staleTime: 0` + the
+    stale-fallback notice, §5.3 / §6.5); only the idle-clean-load rollover
+    is accepted as stale.
 - **Legacy `/?tab=…` links resolve to the Live view by design.** The
   index route drops its `?tab` search param along with the recently-ended
   past view (the first Non-goal above). A bookmarked or shared
@@ -476,12 +494,20 @@ a shared clock built on `useSyncExternalStore` (the same idiom as
   interval runs while no live-elapsed badge is mounted.**
 - `useNowTick(): number` subscribes a component and returns the current
   epoch-ms snapshot, re-rendering it once per second.
-- `ThumbnailBadge` calls `useNowTick()` **only** in the live-elapsed
-  branch (via a small child component or a guarded hook usage) so that
-  static badges do not subscribe. Each subscribed badge re-renders each
-  second; with the handful of concurrently-live cards this is
-  negligible, and the index grid is not virtualized so there is no
-  measurement interaction.
+- **Hook-safety (mandatory split):** `useNowTick()` must **not** be
+  called conditionally inside `ThumbnailBadge`. `ThumbnailBadge` decides
+  which variant to render and, for the live-elapsed case only, renders a
+  **separate child component `LiveElapsedBadge`** that owns the
+  `useNowTick()` call. `ThumbnailBadge` itself calls no clock hook, so a
+  card transitioning between upcoming/live/past (or gaining `actualStart`)
+  only mounts/unmounts `LiveElapsedBadge` rather than changing hook order
+  within a component — this cannot trigger a React hook-order violation.
+  A guarded hook call inside `ThumbnailBadge` is explicitly disallowed.
+- Only `LiveElapsedBadge` subscribes; static variants ("Premiere",
+  "Live", past duration) render no clock hook and never subscribe. Each
+  subscribed badge re-renders once per second; with the handful of
+  concurrently-live cards this is negligible, and the index grid is not
+  virtualized so there is no measurement interaction.
 - Elapsed time is derived purely from epoch milliseconds, so it is
   timezone-independent and unaffected by the timezone preference.
 
