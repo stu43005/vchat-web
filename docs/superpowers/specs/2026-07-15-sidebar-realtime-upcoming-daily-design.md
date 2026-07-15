@@ -54,8 +54,21 @@ YouTube-style badge overlaid on the video-card thumbnail (§7.2).
   buckets a stream by its **start** JST day and does not preserve
   `past`'s recently-ended semantics — a long-running stream that started
   before yesterday but ended recently appears in `past` but in no
-  scheduled today/yesterday daily file. Composing an equivalent view is
-  out of scope for this change.
+  scheduled today/yesterday daily file.
+  - **Concern (reviewer):** removing the only recently-ended browsing
+    surface is a compatibility regression: that class of streams becomes
+    undiscoverable from the top-level browsing flow, and legacy
+    `/?tab=past` links degrade to Live.
+  - **Decision:** not implemented; the original scope decision (approved
+    at design time) stands.
+  - **Rationale:** the reviewer's remedies are all already excluded —
+    keeping `index.json` as a past reader is the rejected dual-reader
+    (above), and adding a `recentlyEnded` file is a cross-repo honeybee
+    contract change out of scope for this reader-side work. Recently-ended
+    streams remain reachable via their channel page and via the
+    `daily-videos` bucket of their **start** day; only a dedicated
+    top-level "recently ended" entry is dropped. `/?tab=past` resolving to
+    Live is covered separately below.
 - **No auto-refresh / polling.** `realtime.json` and `upcoming.json`
   regenerate every minute upstream, but the SPA fetches them only on
   route entry (no `refetchInterval`). Live viewer counts may therefore
