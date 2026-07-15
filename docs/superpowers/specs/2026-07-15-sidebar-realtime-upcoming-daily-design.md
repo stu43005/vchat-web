@@ -179,8 +179,9 @@ All new hooks reuse the existing `retryOnNon404` retry predicate and set
   `fetchJson<UpcomingIndex>("/upcoming.json")`, `queryKey: ["upcoming"]`,
   `staleTime: 60_000`.
 - `useDailyVideosQuery(dateParam: string | undefined):
-  UseQueryResult<{ resolvedDate: string; data: DailyVideos }>` — see
-  §5.3 for the "today" fallback. `enabled: Boolean(dateParam)`.
+  UseQueryResult<{ resolvedDate: string; isFallback: boolean; data: DailyVideos }>`
+  — see §5.3 for the "today" fallback, the `isFallback` flag, and the
+  result-dependent `staleTime`. `enabled: Boolean(dateParam)`.
 
 `useIndexQuery` and its `IndexData` import are **removed**.
 
@@ -194,13 +195,15 @@ literal string `"today"` or a `YYYY-MM-DD` date.
   `NotFoundError` (the day may have just rolled over before the writer
   produced today's file), it retries once with the previous JST day
   (`addDaysYmd(today, -1)`). It returns
-  `{ resolvedDate, data }` where `resolvedDate` is whichever date
-  actually resolved. If the fallback day also 404s, the `NotFoundError`
-  propagates (surfaced as "No data for this date", per §6.5 / §8).
+  `{ resolvedDate, isFallback, data }` where `resolvedDate` is whichever
+  date actually resolved and `isFallback` is `true` **only** when the
+  today file 404'd and the yesterday file served the result. If the
+  fallback day also 404s, the `NotFoundError` propagates (surfaced as
+  "No data for this date", per §6.5 / §8).
 - **`dateParam` is a concrete `YYYY-MM-DD`:** the `queryFn` fetches only
-  that file and does **not** fall back. `resolvedDate` equals
-  `dateParam`. A 200 with `videos: []` is a valid empty day; a 404 means
-  the file was never generated.
+  that file and does **not** fall back. `resolvedDate` equals `dateParam`
+  and `isFallback` is `false`. A 200 with `videos: []` is a valid empty
+  day; a 404 means the file was never generated.
 - **`queryKey`:** `["daily", dateParam]`. Because the key includes the
   literal `"today"`, the today view and a concrete-date view of the same
   calendar day are cached under distinct keys; this is acceptable (at
@@ -211,18 +214,29 @@ literal string `"today"` or a `YYYY-MM-DD` date.
   `catch` `NotFoundError`, fetch yesterday) so the hook issues a single
   logical query and there is no two-render flash: either it resolves to
   data or errors.
-- **Stale-fallback refresh.** When the `"today"` query falls back to the
-  previous day (`resolvedDate !== todayYmdInTokyo()`), the result is
-  based on stale data — the real today file will appear upstream shortly
-  after the rollover, but with no polling and `refetchOnWindowFocus:
-  false` a cached yesterday result would otherwise persist for the
-  logical today route. To bound this: the `"today"` query sets
-  `staleTime: 0` **whenever it resolved via the fallback branch** (a
-  clean today result keeps the normal `staleTime: 60_000`). Combined with
-  React Query's default `refetchOnMount`, the next mount/navigation to
-  `/daily/today` re-attempts today's concrete file, so a stale-yesterday
-  view self-corrects on the user's next visit rather than sticking until
-  a hard reload. This is a best-effort correction, not a live auto-update
+- **Stale-fallback refresh (result-dependent `staleTime`).** When the
+  `"today"` query falls back to the previous day (`isFallback === true`),
+  the cached success holds yesterday's data under the `["daily","today"]`
+  key. With no polling and `refetchOnWindowFocus: false`, a fixed
+  `staleTime` would let that stale success persist for the logical today
+  route even after the real today file appears upstream. To bound this
+  **with a concrete, version-supported mechanism**, `staleTime` is a
+  **function of the query result**, not a static number:
+
+  ```ts
+  // @tanstack/react-query 5.100.13 supports
+  //   staleTime?: number | 'static' | ((query) => number | 'static')
+  // (verified in query-core's StaleTimeFunction type). The function
+  // reads the last resolved data via query.state.data.
+  staleTime: (query) => (query.state.data?.isFallback ? 0 : 60_000)
+  ```
+
+  A fallback result is therefore always stale (`0`), and a clean today
+  result keeps the normal `60_000`. Combined with React Query's default
+  `refetchOnMount`, the next mount/navigation to `/daily/today`
+  re-attempts today's concrete file, so a stale-yesterday view
+  self-corrects on the user's next visit rather than sticking until a
+  hard reload. This is a best-effort correction, not a live auto-update
   (consistent with the no-polling Non-goal). For a user sitting on the
   page across the rollover, the route also renders an explicit
   stale-fallback notice with a Retry control (§6.5) so the yesterday
@@ -375,12 +389,11 @@ wrappers already in the codebase.
   - `NotFoundError` → "No data for this date" (for `today`, this only
     appears after both today and yesterday 404).
   - Other errors → retry alert.
-- **Stale-fallback notice.** When the route was requested as `today` but
-  the query resolved via the yesterday fallback (`$date === "today"` and
-  `resolvedDate !== todayYmdInTokyo()`), the page renders a visible
-  informational note above the list — e.g. "Today's list isn't available
-  yet — showing {resolvedDate}." plus a **Retry** control that calls
-  `query.refetch()`. This keeps the fallback from being silently
+- **Stale-fallback notice.** When the query result has `isFallback ===
+  true` (requested `today`, but the yesterday file served the result),
+  the page renders a visible informational note above the list — e.g.
+  "Today's list isn't available yet — showing {resolvedDate}." plus a
+  **Retry** control that calls `query.refetch()`. This keeps the fallback from being silently
   presented as today's ranking (the date switcher already shows the
   concrete `resolvedDate`, and this note names the reason). Recovery is
   user-driven (Retry, or navigating away and back per §5.3's
