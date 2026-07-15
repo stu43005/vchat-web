@@ -86,6 +86,21 @@ YouTube-style badge overlaid on the video-card thumbnail (§7.2).
     absent. `daily-videos` has no `index.json` equivalent to fall back
     to at all. A 404 on these files is therefore treated as an ordinary
     error/empty state (§8), not a migration path.
+- **No runtime schema validation / version gating of the new payloads.**
+  - **Concern (reviewer):** without runtime validation (e.g. zod) and a
+    contract-version check, schema drift or a stale environment could
+    silently render wrong counts, empty lists, or bad sorting instead of
+    failing fast with a compatibility error.
+  - **Decision:** not implemented.
+  - **Rationale:** inconsistent with the established codebase pattern and
+    disproportionate. `fetchJson` casts every JSON payload
+    (`index`/`channel`/`meta`) with `as T` today; the only zod-validated
+    path is per-line JSONL parsing, because a streaming line format is
+    the highest-risk input. The new files are single-version (v1), and v1
+    carries **no** `version` field (the contract detects version by its
+    absence ⇒ v1), so a version check would be inert now. The reader
+    parses the v1 shape and ignores unknown fields (forward
+    compatibility), matching how the app already reads its other JSON.
 - **Legacy `/?tab=…` links resolve to the Live view by design.** The
   index route drops its `?tab` search param along with the recently-ended
   past view (the first Non-goal above). A bookmarked or shared
@@ -303,9 +318,22 @@ wrappers already in the codebase.
 ### 6.5 Daily route (`src/routes/daily.$date.tsx`, new)
 
 - Route param `$date` is the literal `"today"` or a `YYYY-MM-DD` string.
-  A param that is neither `"today"` nor a `^\d{4}-\d{2}-\d{2}$` match is
-  treated as not-found (render the `NotFound` component / an
-  equivalent message); no fetch is issued.
+  A param is treated as not-found (render the `NotFound` component / an
+  equivalent message, **no fetch issued**) unless it is `"today"` or it
+  passes **semantic** date validation, not just the `^\d{4}-\d{2}-\d{2}$`
+  shape. A helper `isValidYmd(s: string): boolean` checks both:
+  - **Shape:** matches `^\d{4}-\d{2}-\d{2}$`.
+  - **Real calendar date:** the parsed `year`/`month`/`day` round-trip
+    through `Date.UTC(y, m-1, d)` unchanged (rejects impossible dates
+    such as `2026-99-99`, `0000-00-00`, `2026-02-30`).
+  - **Not in the future:** the date is `≤ todayYmdInTokyo()` (lexical
+    compare on zero-padded strings). Future dates are not-found without a
+    network request — daily files never exist ahead of today, and this
+    matches the `›`-disabled-at-today boundary (the date switcher
+    below). This
+    guards direct links, stale bookmarks, and crawlers from issuing
+    nonsense fetches that would otherwise 404 into a misleading "No data
+    for this date".
 - `validateSearch`:
 
   ```ts
