@@ -223,8 +223,10 @@ literal string `"today"` or a `YYYY-MM-DD` date.
   `/daily/today` re-attempts today's concrete file, so a stale-yesterday
   view self-corrects on the user's next visit rather than sticking until
   a hard reload. This is a best-effort correction, not a live auto-update
-  (consistent with the no-polling Non-goal); a user sitting on the page
-  across the rollover still sees yesterday until they navigate.
+  (consistent with the no-polling Non-goal). For a user sitting on the
+  page across the rollover, the route also renders an explicit
+  stale-fallback notice with a Retry control (§6.5) so the yesterday
+  result is never silently labeled as today; recovery stays user-driven.
 
 ### 5.4 Date / duration helpers (`src/lib/format.ts`)
 
@@ -373,6 +375,17 @@ wrappers already in the codebase.
   - `NotFoundError` → "No data for this date" (for `today`, this only
     appears after both today and yesterday 404).
   - Other errors → retry alert.
+- **Stale-fallback notice.** When the route was requested as `today` but
+  the query resolved via the yesterday fallback (`$date === "today"` and
+  `resolvedDate !== todayYmdInTokyo()`), the page renders a visible
+  informational note above the list — e.g. "Today's list isn't available
+  yet — showing {resolvedDate}." plus a **Retry** control that calls
+  `query.refetch()`. This keeps the fallback from being silently
+  presented as today's ranking (the date switcher already shows the
+  concrete `resolvedDate`, and this note names the reason). Recovery is
+  user-driven (Retry, or navigating away and back per §5.3's
+  `staleTime: 0`); there is deliberately **no** background timer, to
+  honor the no-polling Non-goal. A clean today result shows no note.
 - `useDocumentTitle` reflects the resolved date, e.g.
   `` `${resolvedDate} — VChat` ``.
 
