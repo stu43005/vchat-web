@@ -1550,6 +1550,7 @@ Ensure `.env.local` sets `VITE_DATA_PROXY` to a deployment serving the honeybee 
 - `/upcoming` shows **Recently Started** and **Scheduled** sections, each with its own empty note when empty.
 - `/daily/today` resolves the current JST day; on a today-file 404 it shows yesterday with the info notice ("Today's list isn't available yet — showing {date}") and a working Retry.
 - On `/daily/today`, the `‹ ›` switcher navigates between concrete days and the `›` button is disabled at today; the Time / Max Viewers / Likes toggle updates `?sort=` and re-sorts the list (missing metric values sort last).
+- `/daily/{YYYY-MM-DD}` for a concrete past date that has a file shows that day's streams (independent of the `today` alias path).
 - `/daily/2026-02-30` (impossible) and a future date render "Not Found" with **no** network request; `/daily/{a real past date with no file}` shows "No data for this date".
 - Sidebar highlights the active entry; **Top Viewers Today** / **Top Likes Today** highlight only on `/daily/today` with the matching `sort`.
 - Video cards show the metrics row (three icons + tooltips; `—` for missing values) and the thumbnail badge: a live stream with `actualStart` shows a red badge whose timer ticks each second; a live premiere shows "Premiere"; a live stream without `actualStart` shows "Live"; an ended stream shows its formatted duration on a black badge; an upcoming stream shows no badge. Clicking a card still navigates (badge does not intercept clicks).
@@ -1559,11 +1560,9 @@ Ensure `.env.local` sets `VITE_DATA_PROXY` to a deployment serving the honeybee 
 - [ ] **Step 3: Commit (only if Step 1 or Step 2 required a fix)**
 
 If the static checks and manual exercise all passed with no changes, there is
-nothing to commit — skip this step. If a fix was required, stage only the
-specific files you changed (list each path explicitly; do not use `git add -A`)
-and commit:
+nothing to commit — skip this step entirely.
 
-```bash
-git add src/path/to/changed-file.tsx  # repeat per file actually modified
-git commit -m "fix: address final verification findings"
-```
+If a fix was required, stage only the specific files you actually modified,
+naming each path explicitly on the `git add` line (do not use `git add -A` or
+`git add .`), then commit with the message
+`fix: address final verification findings`.
