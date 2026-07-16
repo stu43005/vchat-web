@@ -12,6 +12,8 @@ import {
 import { useTimezonePref } from "../lib/settings";
 import { RouterAnchor } from "../lib/createMuiLink";
 import { StatusText } from "./StatusText";
+import { MetricsRow } from "./MetricsRow";
+import { ThumbnailBadge } from "./ThumbnailBadge";
 
 interface VideoCardProps {
   video: VideoSummary | VideoSummaryWithoutChannel;
@@ -87,6 +89,12 @@ export function VideoCard({ video, channel, hideChannel = false }: VideoCardProp
               sx={{ position: "absolute", top: 8, left: 8 }}
             />
           )}
+          <ThumbnailBadge
+            status={video.status}
+            premiere={video.premiere}
+            actualStart={video.actualStart}
+            duration={video.duration}
+          />
         </Box>
         <CardContent sx={{ pb: 1 }}>
           <Typography
@@ -143,6 +151,15 @@ export function VideoCard({ video, channel, hideChannel = false }: VideoCardProp
               timezone={timezone}
             />
           </Typography>
+          <Box
+            sx={{ position: "relative", zIndex: 2, pointerEvents: "auto", mt: 0.5 }}
+          >
+            <MetricsRow
+              viewers={video.viewers}
+              maxViewers={video.maxViewers}
+              likes={video.likes}
+            />
+          </Box>
         </CardContent>
         <Box
           sx={{
