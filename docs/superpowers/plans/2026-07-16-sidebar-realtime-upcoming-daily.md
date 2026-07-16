@@ -434,6 +434,9 @@ let timer: ReturnType<typeof setInterval> | null = null;
 function subscribe(cb: () => void): () => void {
   listeners.add(cb);
   if (timer === null) {
+    // Refresh immediately so the first render after subscribing uses a
+    // current timestamp rather than a stale module-load value.
+    now = Date.now();
     timer = setInterval(() => {
       now = Date.now();
       listeners.forEach((l) => l());
@@ -603,12 +606,18 @@ The second `CardContent` contains the channel link and a
 `<Typography variant="caption" …>` wrapping `<StatusText … />`. Immediately **after** that closing `</Typography>` (and before the `CardContent` closes), add:
 
 ```tsx
-          <MetricsRow
-            viewers={video.viewers}
-            maxViewers={video.maxViewers}
-            likes={video.likes}
-          />
+          <Box
+            sx={{ position: "relative", zIndex: 2, pointerEvents: "auto", mt: 0.5 }}
+          >
+            <MetricsRow
+              viewers={video.viewers}
+              maxViewers={video.maxViewers}
+              likes={video.likes}
+            />
+          </Box>
 ```
+
+**Why the wrapper:** `VideoCard`'s content sits in a `Box` with `pointerEvents: "none"` (so clicks fall through to the full-card overlay link). MUI `Tooltip` needs pointer/focus events on its child, so the metrics row must re-enable them — mirroring the existing channel-link exception in this file (`position: relative; zIndex: 2; pointerEvents: auto`). `Box` is already imported in `VideoCard`. The consequence is that the metrics-row strip itself is not a click-through-to-navigate area (the rest of the card still is), which is acceptable and matches how the channel link already opts back in.
 
 - [ ] **Step 4: Typecheck**
 
@@ -1204,7 +1213,7 @@ Depends on the `/`, `/upcoming`, and `/daily/$date` routes existing (Tasks 9–1
 
 ```tsx
 import type { ReactNode } from "react";
-import { Box, Drawer, List } from "@mui/material";
+import { Drawer, List } from "@mui/material";
 import { useRouterState } from "@tanstack/react-router";
 import LiveTvIcon from "@mui/icons-material/LiveTv";
 import ScheduleIcon from "@mui/icons-material/Schedule";
@@ -1274,24 +1283,24 @@ interface AppSidebarProps {
 export function AppSidebar({ mobileOpen, onClose }: AppSidebarProps) {
   return (
     <>
-      {/* Desktop: in-flow sidebar under the sticky TopBar. */}
-      <Box
-        component="nav"
+      {/* Desktop: permanent drawer, paper offset below the sticky TopBar. */}
+      <Drawer
+        variant="permanent"
         sx={{
           display: { xs: "none", sm: "block" },
           width: DRAWER_WIDTH,
           flexShrink: 0,
-          borderRight: 1,
-          borderColor: "divider",
-          position: "sticky",
-          top: "var(--topbar-h)",
-          alignSelf: "flex-start",
-          height: "calc(100vh - var(--topbar-h))",
-          overflowY: "auto",
+          "& .MuiDrawer-paper": {
+            width: DRAWER_WIDTH,
+            boxSizing: "border-box",
+            top: "var(--topbar-h)",
+            height: "auto",
+            bottom: 0,
+          },
         }}
       >
         <SidebarNav />
-      </Box>
+      </Drawer>
       {/* Mobile: temporary overlay drawer, closes on navigation. */}
       <Drawer
         variant="temporary"
@@ -1300,7 +1309,7 @@ export function AppSidebar({ mobileOpen, onClose }: AppSidebarProps) {
         ModalProps={{ keepMounted: true }}
         sx={{
           display: { xs: "block", sm: "none" },
-          "& .MuiDrawer-paper": { width: DRAWER_WIDTH },
+          "& .MuiDrawer-paper": { width: DRAWER_WIDTH, boxSizing: "border-box" },
         }}
       >
         <SidebarNav onNavigate={onClose} />
@@ -1310,7 +1319,10 @@ export function AppSidebar({ mobileOpen, onClose }: AppSidebarProps) {
 }
 ```
 
-Note: `RouterBox` is the existing `createLink(Box)` wrapper used by `TopBar`'s breadcrumbs; it accepts typed `to`/`params`/`search`. The `alignSelf: "flex-start"` desktop sidebar relies on the flex row added to `__root` in Task 13.
+Notes:
+
+- `RouterBox` is the existing `createLink(Box)` wrapper used by `TopBar`'s breadcrumbs; it accepts typed `to`/`params`/`search`.
+- The desktop `Drawer` uses `variant="permanent"` (per spec §6.1). Its root reserves `DRAWER_WIDTH` in the `__root` flex row (`flexShrink: 0`); the paper is `position: fixed` by MUI default, offset with `top: var(--topbar-h)` / `bottom: 0` so it sits below the sticky `TopBar` rather than overlapping it.
 
 - [ ] **Step 2: Typecheck**
 
@@ -1463,8 +1475,23 @@ Nothing references `useIndexQuery` after Task 9. Remove it and its now-unused ty
 - [ ] **Step 1: Remove `useIndexQuery` and its import from queries.ts**
 
 In `src/api/queries.ts`:
+
 - Delete the entire `useIndexQuery` function (the `export function useIndexQuery(): UseQueryResult<IndexData> { … }` block near the top).
-- Remove `IndexData` from the `import type { … } from "./types";` list. The import list keeps `ChannelData`, `ChatRow`, `DailyVideos`, `RealtimeIndex`, `UpcomingIndex`, `VideoMeta`.
+- Remove `IndexData` from the `import type { … } from "./types";` list. After the edit, the top import block reads exactly:
+
+```ts
+import { useQuery, type UseQueryResult } from "@tanstack/react-query";
+import { fetchJson, fetchJsonl, NotFoundError } from "./client";
+import type {
+  ChannelData,
+  ChatRow,
+  DailyVideos,
+  RealtimeIndex,
+  UpcomingIndex,
+  VideoMeta,
+} from "./types";
+import { addDaysYmd, todayYmdInTokyo } from "../lib/format";
+```
 
 - [ ] **Step 2: Remove `IndexData` from types.ts**
 
@@ -1479,7 +1506,7 @@ export interface IndexData {
 
 - [ ] **Step 3: Confirm no remaining references**
 
-Run: `grep -rn "IndexData\|useIndexQuery" src`
+Run: `rg -n "IndexData|useIndexQuery" src`
 Expected: no output (both symbols fully removed).
 
 - [ ] **Step 4: Typecheck**
@@ -1526,14 +1553,17 @@ Ensure `.env.local` sets `VITE_DATA_PROXY` to a deployment serving the honeybee 
 - `/daily/2026-02-30` (impossible) and a future date render "Not Found" with **no** network request; `/daily/{a real past date with no file}` shows "No data for this date".
 - Sidebar highlights the active entry; **Top Viewers Today** / **Top Likes Today** highlight only on `/daily/today` with the matching `sort`.
 - Video cards show the metrics row (three icons + tooltips; `—` for missing values) and the thumbnail badge: a live stream with `actualStart` shows a red badge whose timer ticks each second; a live premiere shows "Premiere"; a live stream without `actualStart` shows "Live"; an ended stream shows its formatted duration on a black badge; an upcoming stream shows no badge. Clicking a card still navigates (badge does not intercept clicks).
-- Mobile width (< `sm`): the hamburger opens/closes the temporary drawer, which closes on navigation; desktop (≥ `sm`) shows the permanent in-flow sidebar.
+- Mobile width (< `sm`): the hamburger opens/closes the temporary drawer, which closes on navigation; desktop (≥ `sm`) shows the permanent drawer, which sits below the TopBar without overlapping it.
 - Video page (`/videos/{id}`) shows the metrics row under the status text.
 
-- [ ] **Step 3: Commit (only if any fix was needed in Step 1/2)**
+- [ ] **Step 3: Commit (only if Step 1 or Step 2 required a fix)**
+
+If the static checks and manual exercise all passed with no changes, there is
+nothing to commit — skip this step. If a fix was required, stage only the
+specific files you changed (list each path explicitly; do not use `git add -A`)
+and commit:
 
 ```bash
-git add -- <files touched by fixes>
+git add src/path/to/changed-file.tsx  # repeat per file actually modified
 git commit -m "fix: address final verification findings"
 ```
-
-If no fixes were needed, there is nothing to commit.
