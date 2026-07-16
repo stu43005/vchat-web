@@ -132,6 +132,10 @@ export interface VideoSummary {
   actualStart?: string;
   actualEnd?: string;
   publishedAt?: string;
+  viewers?: number; // live concurrent viewers; 0 after finish
+  maxViewers?: number; // peak concurrent viewers; persists after finish
+  likes?: number; // like count; persists after finish
+  premiere?: boolean; // true for YouTube premieres
 }
 
 export type VideoSummaryWithoutChannel = Omit<VideoSummary, "channel">;
@@ -139,6 +143,23 @@ export type VideoSummaryWithoutChannel = Omit<VideoSummary, "channel">;
 export interface IndexData {
   live: VideoSummary[];
   past: VideoSummary[];
+}
+
+export interface RealtimeIndex {
+  snapshotAt: string;
+  live: VideoSummary[];
+}
+
+export interface UpcomingIndex {
+  snapshotAt: string;
+  upcoming: VideoSummary[];
+  recentlyStarted: VideoSummary[];
+}
+
+export interface DailyVideos {
+  date: string; // "YYYY-MM-DD" (JST) — the day this file lists
+  snapshotAt: string;
+  videos: VideoSummary[];
 }
 
 export interface ChannelData extends ChannelRef {
