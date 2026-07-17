@@ -4,7 +4,6 @@ import type {
   ChannelData,
   ChatRow,
   DailyVideos,
-  IndexData,
   RealtimeIndex,
   UpcomingIndex,
   VideoMeta,
@@ -13,16 +12,6 @@ import { addDaysYmd, todayYmdInTokyo } from "../lib/format";
 
 const retryOnNon404 = (failureCount: number, error: Error) =>
   !(error instanceof NotFoundError) && failureCount < 3;
-
-export function useIndexQuery(): UseQueryResult<IndexData> {
-  return useQuery({
-    queryKey: ["index"],
-    queryFn: () => fetchJson<IndexData>("/index.json"),
-    staleTime: 60_000,
-    gcTime: 5 * 60_000,
-    retry: retryOnNon404,
-  });
-}
 
 export function useChannelQuery(
   channelId: string | undefined,

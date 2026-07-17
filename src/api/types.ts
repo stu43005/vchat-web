@@ -140,11 +140,6 @@ export interface VideoSummary {
 
 export type VideoSummaryWithoutChannel = Omit<VideoSummary, "channel">;
 
-export interface IndexData {
-  live: VideoSummary[];
-  past: VideoSummary[];
-}
-
 export interface RealtimeIndex {
   snapshotAt: string;
   live: VideoSummary[];
