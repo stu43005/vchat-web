@@ -14,6 +14,7 @@ import {
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import Brightness7Icon from "@mui/icons-material/Brightness7";
 import Brightness4Icon from "@mui/icons-material/Brightness4";
+import MenuIcon from "@mui/icons-material/Menu";
 import { Link, useMatch } from "@tanstack/react-router";
 import {
   useResolvedTheme,
@@ -113,7 +114,7 @@ function CrumbLink({ crumb }: { crumb: Crumb }) {
   return <Box sx={baseSx}>{crumb.label}</Box>;
 }
 
-export function TopBar() {
+export function TopBar({ onMenuClick }: { onMenuClick?: () => void }) {
   const appBarRef = useRef<HTMLDivElement>(null);
   const [timezone, setTimezone] = useTimezonePref();
   const resolvedTheme = useResolvedTheme();
@@ -143,6 +144,15 @@ export function TopBar() {
   return (
     <AppBar ref={appBarRef} position="sticky" color="default" elevation={1}>
       <Toolbar sx={{ gap: 2 }}>
+        {isMobile && (
+          <IconButton
+            edge="start"
+            onClick={onMenuClick}
+            aria-label="open navigation"
+          >
+            <MenuIcon />
+          </IconButton>
+        )}
         <Typography
           variant="h6"
           component={Link}

@@ -1,6 +1,8 @@
 import { Outlet, createRootRoute } from "@tanstack/react-router";
 import { Box } from "@mui/material";
+import { useState } from "react";
 import { TopBar } from "../components/TopBar";
+import { AppSidebar } from "../components/AppSidebar";
 import { NotFound } from "../components/NotFound";
 import { lazy, Suspense } from "react";
 
@@ -26,10 +28,19 @@ export const Route = createRootRoute({
 });
 
 function RootLayout() {
+  const [mobileOpen, setMobileOpen] = useState(false);
   return (
     <Box sx={{ minHeight: "100vh" }}>
-      <TopBar />
-      <Outlet />
+      <TopBar onMenuClick={() => setMobileOpen(true)} />
+      <Box sx={{ display: "flex" }}>
+        <AppSidebar
+          mobileOpen={mobileOpen}
+          onClose={() => setMobileOpen(false)}
+        />
+        <Box component="main" sx={{ flexGrow: 1, minWidth: 0 }}>
+          <Outlet />
+        </Box>
+      </Box>
       {import.meta.env.DEV && (
         <Suspense fallback={null}>
           <RouterDevtools />
