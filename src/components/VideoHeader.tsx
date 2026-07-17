@@ -3,6 +3,7 @@ import type { VideoMeta } from "../api/types";
 import { getYouTubeThumbnail, getYouTubeUrl, type TimezonePref } from "../lib/format";
 import { RouterChip } from "../lib/createMuiLink";
 import { StatusText } from "./StatusText";
+import { MetricsRow } from "./MetricsRow";
 
 interface VideoHeaderProps {
   video: VideoMeta;
@@ -63,6 +64,11 @@ export function VideoHeader({ video, timezone }: VideoHeaderProps) {
             timezone={timezone}
           />
         </Typography>
+        <MetricsRow
+          viewers={video.viewers}
+          maxViewers={video.maxViewers}
+          likes={video.likes}
+        />
       </Stack>
     </Stack>
   );
