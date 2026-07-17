@@ -26,3 +26,6 @@ dist-ssr
 .env.local
 .env.*.local
 src/routeTree.gen.ts
+
+# TypeScript incremental build cache (composite projects / tsc -b)
+*.tsbuildinfo
