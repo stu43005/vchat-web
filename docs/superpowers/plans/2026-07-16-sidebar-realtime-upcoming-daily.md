@@ -932,7 +932,9 @@ function UpcomingPage() {
 - [ ] **Step 2: Typecheck (regenerates the route tree)**
 
 Run: `npm run typecheck`
-Expected: PASS. `tsr generate` adds `/upcoming` to `src/routeTree.gen.ts`.
+Expected: PASS. `tsr generate` regenerates `src/routeTree.gen.ts` (adding
+`/upcoming`). **That file is gitignored (`.gitignore`) — it is regenerated on
+every typecheck/build/dev and is never committed. Do NOT stage it.**
 
 - [ ] **Step 3: Lint**
 
@@ -944,10 +946,10 @@ Expected: PASS.
 Run: `npm run build`
 Expected: SUCCESS.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Commit** (stage only the route file; `src/routeTree.gen.ts` is gitignored)
 
 ```bash
-git add src/routes/upcoming.tsx src/routeTree.gen.ts
+git add src/routes/upcoming.tsx
 git commit -m "feat(upcoming): add /upcoming route with recently-started and scheduled sections"
 ```
 
@@ -1181,7 +1183,9 @@ Notes for the implementer:
 - [ ] **Step 2: Typecheck (regenerates the route tree)**
 
 Run: `npm run typecheck`
-Expected: PASS. `tsr generate` adds `/daily/$date` to `src/routeTree.gen.ts`.
+Expected: PASS. `tsr generate` regenerates `src/routeTree.gen.ts` (adding
+`/daily/$date`). **That file is gitignored (`.gitignore`) — it is regenerated on
+every typecheck/build/dev and is never committed. Do NOT stage it.**
 
 - [ ] **Step 3: Lint**
 
@@ -1193,10 +1197,10 @@ Expected: PASS.
 Run: `npm run build`
 Expected: SUCCESS.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Commit** (stage only the route file; `src/routeTree.gen.ts` is gitignored)
 
 ```bash
-git add src/routes/daily.\$date.tsx src/routeTree.gen.ts
+git add src/routes/daily.\$date.tsx
 git commit -m "feat(daily): add /daily/\$date route with date and sort controls"
 ```
 
