@@ -1,4 +1,17 @@
-import { Avatar, Box, Card, CardContent, Chip, Stack, Typography } from "@mui/material";
+import type { ReactNode } from "react";
+import {
+  Avatar,
+  Box,
+  Card,
+  CardContent,
+  Chip,
+  Stack,
+  Tooltip,
+  Typography,
+} from "@mui/material";
+import PaidIcon from "@mui/icons-material/Paid";
+import GroupIcon from "@mui/icons-material/Group";
+import CardGiftcardIcon from "@mui/icons-material/CardGiftcard";
 import type {
   ChannelRef,
   VideoSummary,
@@ -19,6 +32,32 @@ interface VideoCardProps {
   video: VideoSummary | VideoSummaryWithoutChannel;
   channel: ChannelRef;
   hideChannel?: boolean;
+}
+
+const statIconSx = { fontSize: "1rem" } as const;
+
+// Icon + value pair for the footer stats, matching MetricsRow's presentation.
+// The label is conveyed by tooltip only (no visible text label).
+function StatItem({
+  icon,
+  label,
+  value,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <Tooltip title={label}>
+      <Box
+        component="span"
+        sx={{ display: "inline-flex", alignItems: "center", gap: 0.25 }}
+      >
+        {icon}
+        <span>{value}</span>
+      </Box>
+    </Tooltip>
+  );
 }
 
 export function VideoCard({ video, channel, hideChannel = false }: VideoCardProps) {
@@ -164,6 +203,11 @@ export function VideoCard({ video, channel, hideChannel = false }: VideoCardProp
         </CardContent>
         <Box
           sx={{
+            // relative + z-index + pointer-events so the footer's tooltips can
+            // receive hover events through the card's pointer-events:none wrapper.
+            position: "relative",
+            zIndex: 2,
+            pointerEvents: "auto",
             px: 2,
             py: 1,
             borderTop: 1,
@@ -172,10 +216,22 @@ export function VideoCard({ video, channel, hideChannel = false }: VideoCardProp
             color: "text.secondary",
           }}
         >
-          <Stack direction="row" spacing={1} divider={<Box>·</Box>}>
-            <span>SC: {formatCurrency(video.stats.superChatTotalJpy, "JPY")}</span>
-            <span>Members: {video.stats.memberCount.toLocaleString()}</span>
-            <span>Gifts: {video.stats.giftCount.toLocaleString()}</span>
+          <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
+            <StatItem
+              icon={<PaidIcon sx={statIconSx} />}
+              label="SuperChat total"
+              value={formatCurrency(video.stats.superChatTotalJpy, "JPY")}
+            />
+            <StatItem
+              icon={<GroupIcon sx={statIconSx} />}
+              label="Members"
+              value={video.stats.memberCount.toLocaleString()}
+            />
+            <StatItem
+              icon={<CardGiftcardIcon sx={statIconSx} />}
+              label="Gifts"
+              value={video.stats.giftCount.toLocaleString()}
+            />
           </Stack>
         </Box>
       </Box>
