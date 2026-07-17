@@ -1,16 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import {
-  Alert,
-  Button,
-  Container,
-  Grid,
-  Skeleton,
-  Typography,
-} from "@mui/material";
+import { Alert, Button, Container, Grid, Typography } from "@mui/material";
 import { useChannelQuery } from "../api/queries";
 import { NotFoundError } from "../api/client";
 import { ChannelHeader } from "../components/ChannelHeader";
 import { VideoCard } from "../components/VideoCard";
+import { VideoCardSkeleton } from "../components/VideoCardSkeleton";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
 
 export const Route = createFileRoute("/channels/$channelId")({
@@ -29,8 +23,7 @@ function ChannelPage() {
         <Grid container spacing={2}>
           {Array.from({ length: 8 }).map((_, i) => (
             <Grid key={i} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
-              <Skeleton variant="rectangular" sx={{ aspectRatio: "16/9" }} />
-              <Skeleton width="80%" />
+              <VideoCardSkeleton hideChannel />
             </Grid>
           ))}
         </Grid>
