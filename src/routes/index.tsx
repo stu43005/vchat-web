@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import {
   Alert,
   Box,
@@ -6,30 +6,20 @@ import {
   Container,
   Grid,
   Skeleton,
-  Tab,
-  Tabs,
   Typography,
 } from "@mui/material";
-import { z } from "zod";
-import { useIndexQuery } from "../api/queries";
+import { useRealtimeQuery } from "../api/queries";
 import { NotFoundError } from "../api/client";
 import { VideoCard } from "../components/VideoCard";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
 
-const indexSearchSchema = z.object({
-  tab: z.enum(["live", "past"]).default("live"),
-});
-
 export const Route = createFileRoute("/")({
-  validateSearch: indexSearchSchema,
   component: IndexPage,
 });
 
 function IndexPage() {
   useDocumentTitle("VChat");
-  const { tab } = Route.useSearch();
-  const navigate = useNavigate({ from: "/" });
-  const query = useIndexQuery();
+  const query = useRealtimeQuery();
 
   if (query.isPending) {
     return (
@@ -51,7 +41,7 @@ function IndexPage() {
     if (query.error instanceof NotFoundError) {
       return (
         <Container sx={{ py: 2 }}>
-          <Alert severity="warning">No archive index found.</Alert>
+          <Alert severity="warning">No realtime data found.</Alert>
         </Container>
       );
     }
@@ -65,32 +55,19 @@ function IndexPage() {
             </Button>
           }
         >
-          Failed to load archive index.
+          Failed to load live streams.
         </Alert>
       </Container>
     );
   }
 
-  const data = query.data;
-  const list = tab === "live" ? data.live : data.past;
+  const list = query.data.live;
 
   return (
     <Container sx={{ py: 2 }}>
-      <Tabs
-        value={tab}
-        onChange={(_, value: "live" | "past") =>
-          navigate({ search: { tab: value }, replace: true })
-        }
-        sx={{ mb: 2 }}
-      >
-        <Tab value="live" label={`Live / Upcoming (${data.live.length})`} />
-        <Tab value="past" label={`Past (${data.past.length})`} />
-      </Tabs>
       {list.length === 0 ? (
         <Box sx={{ py: 8, textAlign: "center" }}>
-          <Typography color="text.secondary">
-            {tab === "live" ? "No live streams" : "No past archives"}
-          </Typography>
+          <Typography color="text.secondary">No live streams right now</Typography>
         </Box>
       ) : (
         <Grid container spacing={2}>
