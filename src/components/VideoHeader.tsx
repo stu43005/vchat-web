@@ -65,6 +65,7 @@ export function VideoHeader({ video, timezone }: VideoHeaderProps) {
           />
         </Typography>
         <MetricsRow
+          status={video.status}
           viewers={video.viewers}
           maxViewers={video.maxViewers}
           likes={video.likes}

@@ -155,6 +155,7 @@ export function VideoCard({ video, channel, hideChannel = false }: VideoCardProp
             sx={{ position: "relative", zIndex: 2, pointerEvents: "auto", mt: 0.5 }}
           >
             <MetricsRow
+              status={video.status}
               viewers={video.viewers}
               maxViewers={video.maxViewers}
               likes={video.likes}
