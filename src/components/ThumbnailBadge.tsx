@@ -16,6 +16,10 @@ const badgeSx: SxProps<Theme> = {
   lineHeight: 1.2,
   color: "#fff",
   pointerEvents: "none",
+  // Monospace so the live elapsed timer doesn't reflow the badge width as
+  // digits change each second.
+  fontFamily: "monospace",
+  fontVariantNumeric: "tabular-nums",
 };
 
 // Live elapsed timer; the only variant that subscribes to the shared clock.
