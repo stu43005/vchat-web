@@ -115,6 +115,33 @@ export type ChatRow =
 
 export type FilterableType = Exclude<ChatRow["type"], "raidOutgoing">;
 
+// Canonical filterable row types, in chip / URL order. Single source for the
+// chip record in FilterChips and the `types` search-param enum in the video
+// route — keep new row types in sync HERE, not in three places.
+export const FILTERABLE_TYPES = [
+  "chat",
+  "superChat",
+  "superSticker",
+  "gift",
+  "membership",
+  "membershipGift",
+  "membershipGiftPurchase",
+  "milestone",
+  "poll",
+  "raid",
+] as const satisfies readonly FilterableType[];
+
+// Two complementary compile-time checks:
+//   `satisfies` above rejects an entry that is not a filterable row type
+//   (a typo, or "raidOutgoing").
+//   The assertion below rejects a filterable row type the tuple FORGOT: the
+//   Exclude resolves to the missing member, which fails `extends never`, and
+//   tsc names it in the error.
+type AssertNever<T extends never> = T;
+export type FilterableTypesAreExhaustive = AssertNever<
+  Exclude<FilterableType, (typeof FILTERABLE_TYPES)[number]>
+>;
+
 export interface ChannelRef {
   id: string;
   name: string;
