@@ -21,13 +21,13 @@ const CHIP_META: Record<
   gift: { label: "Gift", count: (a) => (a.jewelGiftCount ?? 0).toLocaleString() },
   membership: { label: "Member", count: (a) => a.membershipCount.toLocaleString() },
   membershipGift: {
-    label: "Gifts Received",
+    label: "Membership Gifts Received",
     count: (a) => a.giftCount.toLocaleString(),
   },
   membershipGiftPurchase: {
-    label: "Gift Purchases",
+    label: "Membership Gift Purchases",
     count: (a) =>
-      `${a.giftPurchaseCount.toLocaleString()}, ${a.totalGiftAmount.toLocaleString()} gifts`,
+      `${a.giftPurchaseCount.toLocaleString()}, ${a.totalGiftAmount.toLocaleString()} membership gifts`,
   },
   milestone: { label: "Milestone", count: (a) => a.milestoneCount.toLocaleString() },
   poll: { label: "Poll", count: (a) => a.pollCount.toLocaleString() },
