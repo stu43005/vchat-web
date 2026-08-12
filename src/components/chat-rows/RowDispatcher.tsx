@@ -4,6 +4,7 @@ import type { TimezonePref } from "../../lib/format";
 import { ChatRow as ChatRowComponent } from "./ChatRow";
 import { SuperChatRow } from "./SuperChatRow";
 import { SuperStickerRow } from "./SuperStickerRow";
+import { GiftRow } from "./GiftRow";
 import { MembershipRow } from "./MembershipRow";
 import { MembershipGiftRow } from "./MembershipGiftRow";
 import { MembershipGiftPurchaseRow } from "./MembershipGiftPurchaseRow";
@@ -27,6 +28,8 @@ function RowDispatcherImpl({ row, no, video, timezone }: Props) {
       return <SuperChatRow row={row} no={no} video={video} timezone={timezone} />;
     case "superSticker":
       return <SuperStickerRow row={row} no={no} video={video} timezone={timezone} />;
+    case "gift":
+      return <GiftRow row={row} no={no} video={video} timezone={timezone} />;
     case "membership":
       return <MembershipRow row={row} no={no} video={video} timezone={timezone} />;
     case "membershipGift":

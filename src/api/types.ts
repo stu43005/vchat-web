@@ -37,6 +37,15 @@ export interface ChatRowSuperSticker extends AuthorFields {
   color?: string;
 }
 
+export interface ChatRowGift extends AuthorFields {
+  type: "gift";
+  giftName?: string; // display name; absent outside the English locale
+  assetName?: string; // gift image file name, e.g. "finger_heart"
+  image?: string; // gift image URL
+  amount?: number; // Jewels for this ONE gift; absent when the price is unknown
+  currency: string; // always "JEWEL"
+}
+
 export interface ChatRowMembership extends AuthorFields {
   type: "membership";
   level?: string;
@@ -95,6 +104,7 @@ export type ChatRow =
   | ChatRowChat
   | ChatRowSuperChat
   | ChatRowSuperSticker
+  | ChatRowGift
   | ChatRowMembership
   | ChatRowMembershipGift
   | ChatRowMembershipGiftPurchase
@@ -172,9 +182,10 @@ export interface VideoAggregates {
   superChatCount: number;
   superStickerCount: number;
   membershipCount: number;
-  giftCount: number;
+  giftCount: number; // membership gifts, NOT Jewels gifts
   giftPurchaseCount: number;
   totalGiftAmount: number;
+  jewelGiftCount?: number; // gift rows; since archive v2 r1
   milestoneCount: number;
   pollCount: number;
   raidCount: number;

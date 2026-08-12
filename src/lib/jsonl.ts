@@ -6,6 +6,7 @@ const rowTypeSchema = z.object({
     "chat",
     "superChat",
     "superSticker",
+    "gift",
     "membership",
     "membershipGift",
     "membershipGiftPurchase",

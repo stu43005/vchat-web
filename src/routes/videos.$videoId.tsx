@@ -23,6 +23,7 @@ const filterableTypeEnum = z.enum([
   "chat",
   "superChat",
   "superSticker",
+  "gift",
   "membership",
   "membershipGift",
   "membershipGiftPurchase",
