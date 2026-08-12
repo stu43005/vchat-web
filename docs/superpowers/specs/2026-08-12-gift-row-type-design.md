@@ -52,6 +52,23 @@ notions of "gift" are no longer ambiguous in the UI.
   hundreds of gift rows (the contract doc's own example shows 143),
   which would swamp the SuperChat rows the default view exists to
   surface.
+- **No guards on the shared author-row fields.** A review raised that
+  a `gift` row with a missing or invalid `timestamp` would throw in
+  `TimestampLink`'s `new Date(...)` / `formatToParts`, and that a
+  non-primitive `authorName` would throw in a React text slot —
+  crashing the virtualized list rather than one row.
+  **Decision:** not implemented — no guards are added to `GiftRow`, to
+  `TimestampLink`, or to `ChatRowBase` for these fields.
+  **Rationale:** the exposure is pre-existing and project-wide, not
+  something `gift` introduces. `chat`, `superChat` and the other eight
+  row types all reach the same unguarded `TimestampLink` and the same
+  text slots today, through the same `type`-only parser. Guarding them
+  for `gift` alone would make one row type behave differently from its
+  nine siblings while leaving the actual hole open; guarding them in
+  the shared infrastructure is a whole-app defensive-rendering change
+  that belongs in its own spec. Scoped to this premise: if the shared
+  row infrastructure ever starts guarding these fields, `gift` should
+  follow it rather than keep a local exception.
 - **No test framework.** The project has none (no `test` script, no
   vitest/jest). This change does not introduce one; see §8.
 - **No meta/JSONL count-consistency mechanism.** A review raised that an
@@ -206,6 +223,11 @@ amount (monospace)   image (maxHeight 48)   name
   blast radius without reintroducing field-level validation in the
   parser. It is the render boundary's job precisely because the parser
   deliberately does none.
+
+  These guards are scoped to the fields this spec introduces. The
+  shared author-row fields (`timestamp`, `authorName`, `authorPhoto`)
+  are rendered by existing infrastructure and keep its existing
+  behavior — see the accepted limitation in §3.
 
   The derived name gets the same treatment for the same reason — React
   throws on a non-primitive rendered as a text child:
@@ -393,10 +415,12 @@ Edge cases:
 - **All optional fields absent** — a row with no `giftName`,
   `assetName`, `image`, or `amount` still renders: timestamp, author,
   and the literal name `Gift`.
-- **Contract-violating field types** — a row whose `amount` is `null`,
-  a string, or `NaN`, or whose `giftName` / `assetName` is not a
-  string, renders as if that field were absent (§6.2 guards). The row
-  is never dropped and never throws.
+- **Contract-violating gift-specific field types** — a row whose
+  `amount` is `null`, a string, or `NaN`, or whose `giftName` /
+  `assetName` / `image` is not a string, renders as if that field were
+  absent (§6.2 guards). The row is never dropped, and none of these
+  five fields can throw. The guards cover the gift-specific fields
+  only; the shared author-row fields are out of scope (§3).
 - **Unknown extra fields** — ignored, per the contract's
   forward-compatibility rule and the parser's existing cast.
 
