@@ -39,10 +39,12 @@ notions of "gift" are no longer ambiguous in the UI.
   would freeze whatever undercount held at archive time). The SPA
   therefore shows no Jewels sum on video cards, in the header, or in
   the currency table.
-- **No per-field validation of `gift` rows.** `parseJSONL` validates
-  only the `type` discriminator and casts the rest; `gift` gets the
-  same treatment as every other row type. Introducing field-level
-  validation for one row type would break that uniformity.
+- **No per-field validation of `gift` rows in the parser.**
+  `parseJSONL` validates only the `type` discriminator and casts the
+  rest; `gift` gets the same treatment as every other row type.
+  Introducing field-level validation for one row type would break that
+  uniformity. The guards in §6.2 are not parser validation — they live
+  in `GiftRow`, decide only what to display, and never reject a row.
 - **`gift` is not added to `DEFAULT_TYPES`.** A single stream can carry
   hundreds of gift rows (the contract doc's own example shows 143),
   which would swamp the SuperChat rows the default view exists to
@@ -55,6 +57,23 @@ notions of "gift" are no longer ambiguous in the UI.
   review surface of an otherwise additive change.
 - **No test framework.** The project has none (no `test` script, no
   vitest/jest). This change does not introduce one; see §8.
+- **No meta/JSONL count-consistency mechanism.** A review raised that an
+  absent `jewelGiftCount` treated as `0` could show a false `Gift (0)`
+  if a video's `meta.json` and `.jsonl` were ever served from different
+  archive revisions (CDN skew, partial publish), hiding gift rows that
+  the SPA in fact loaded.
+  **Decision:** not implemented — no row-derived count, no mismatch
+  warning, no cache-busting.
+  **Rationale:** (1) the exposure is not specific to gift — a stale
+  `meta.json` makes `chatCount`, `superChatCount` and the other seven
+  chips equally wrong, so a special case for one chip would be
+  inconsistent without reducing the underlying risk; (2) the upstream
+  contract states the archive "is written once and never revised", so
+  one video's meta and jsonl do not come from different writer
+  revisions; (3) the writer renames the `.jsonl` before the
+  `.meta.json`, so a reader that got the meta is guaranteed the sibling
+  jsonl is already in place. Scoped to these premises: if honeybee ever
+  starts revising archives in place, this is a fresh question.
 
 ## 4. Upstream contract (already shipped)
 
@@ -152,6 +171,9 @@ export function formatJewels(amount: number): string {
 so `Intl` throws `RangeError` — which would take down the whole row
 render, not just the amount.
 
+`formatJewels` takes a `number` and is only reached through the render
+guard in §6.2 — it does no defensive checking of its own.
+
 `GiftRow` does not read `row.currency`. The contract fixes it at
 `"JEWEL"`, so there is no branch to take on it.
 
@@ -166,16 +188,46 @@ amount (monospace)   image (maxHeight 48)   name
                      [🖼]                   rose      ← amount absent
 ```
 
-- **amount** — rendered via `formatJewels(row.amount)` only when
-  `row.amount !== undefined`. When absent, the slot is empty. No
-  `"N/A"` placeholder: it would be indistinguishable at a glance from
-  a real `0`.
+- **amount** — rendered via `formatJewels(row.amount)` only when the
+  value passes a render-boundary guard:
+
+  ```ts
+  const hasAmount = typeof row.amount === "number" && Number.isFinite(row.amount);
+  ```
+
+  When the guard fails, the slot is empty. No `"N/A"` placeholder: it
+  would be indistinguishable at a glance from a real `0`.
+
+  **Why a `typeof` check and not just `!== undefined`:** `parseJSONL`
+  validates only the `type` discriminator and casts the rest (§5.2,
+  §3), so the declared `amount?: number` is a claim about the contract,
+  not a checked fact. A row carrying `null`, a string, or `NaN` would
+  reach `formatJewels`, and `amount.toLocaleString` on a non-number
+  throws — inside the virtualized list that takes down the whole chat
+  render, not one row. The guard is two operators and contains the
+  blast radius without reintroducing field-level validation in the
+  parser. It is the render boundary's job precisely because the parser
+  deliberately does none.
+
+  The derived name gets the same treatment for the same reason — React
+  throws on a non-primitive rendered as a text child:
+
+  ```ts
+  const name =
+    typeof row.giftName === "string" ? row.giftName
+    : typeof row.assetName === "string" ? row.assetName
+    : "Gift";
+  ```
+
+  `image` needs no guard: it is only ever an attribute value, which the
+  DOM coerces without throwing.
 - **image** — `<Box component="img">` with `loading="lazy"` and
   `referrerPolicy="no-referrer"` (the assets are gstatic URLs; this
   matches the project's external-image convention). Omitted entirely
   when `row.image` is absent.
-- **name** — `row.giftName ?? row.assetName ?? "Gift"`. The same string
-  is the image's `alt` and `title`.
+- **name** — the guarded `name` above (`giftName`, else `assetName`,
+  else the literal `"Gift"`). The same string is the image's `alt` and
+  `title`.
 
 No `ColorBadge` (a gift row has no `color`) and no left accent border
 (`authorType` is always `"other"`, so there is no badge state to
@@ -251,6 +303,10 @@ Edge cases:
 - **All optional fields absent** — a row with no `giftName`,
   `assetName`, `image`, or `amount` still renders: timestamp, author,
   and the literal name `Gift`.
+- **Contract-violating field types** — a row whose `amount` is `null`,
+  a string, or `NaN`, or whose `giftName` / `assetName` is not a
+  string, renders as if that field were absent (§6.2 guards). The row
+  is never dropped and never throws.
 - **Unknown extra fields** — ignored, per the contract's
   forward-compatibility rule and the parser's existing cast.
 
