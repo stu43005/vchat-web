@@ -229,7 +229,7 @@ export function VideoCard({ video, channel, hideChannel = false }: VideoCardProp
             />
             <StatItem
               icon={<CardGiftcardIcon sx={statIconSx} />}
-              label="Gifts"
+              label="Membership Gifts"
               value={video.stats.giftCount.toLocaleString()}
             />
           </Stack>
