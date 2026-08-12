@@ -669,7 +669,18 @@ If `VITE_DATA_PROXY` is unset or the proxied deployment is unreachable, **stop h
 
 Do not go hunting in the UI. Query the proxied archive directly and record the video IDs. `jq` reads JSONL line by line, so these work unmodified. If `jq` is not installed, install it (`brew install jq`) — the fallback of eyeballing raw JSONL is error-prone.
 
-Pick a candidate video ID from the index page, then classify it:
+First enumerate candidate video IDs. `fetchJson` prefixes every path with `/data`, so the archive indexes sit at these URLs:
+
+```bash
+# Currently live streams:
+curl -s "http://localhost:5173/data/realtime.json" | jq -r '.live[].id'
+
+# Every stream that started on a given JST day (pick recent dates —
+# gift rows only exist in archives written since v2 r1):
+curl -s "http://localhost:5173/data/daily-videos/2026-08-11.json" | jq -r '.videos[].id'
+```
+
+Expected: one 11-character YouTube video ID per line. A 404 on a daily file just means that day has no archive — try another date. Feed the IDs into the checks below.
 
 ```bash
 # A: does this video have gift rows at all, and how many?
@@ -682,16 +693,18 @@ Expected for an r1 archive with gifts: a number `> 0`. `null` means the field is
 ```bash
 # B: which gift-row shapes does this video actually contain?
 curl -s "http://localhost:5173/data/videos/<videoId>.jsonl" \
-  | jq -c 'select(.type=="gift") | {amount: (.amount != null), image: (.image != null), giftName: (.giftName != null)}' \
+  | jq -c 'select(.type=="gift") | {amount: (.amount != null), image: (.image != null), giftName: (.giftName != null), assetName: (.assetName != null)}' \
   | sort | uniq -c
 ```
 
 Expected: a small table such as:
 
 ```text
-  118 {"amount":true,"image":true,"giftName":true}
-   25 {"amount":false,"image":true,"giftName":true}
+  118 {"amount":true,"image":true,"giftName":true,"assetName":true}
+   25 {"amount":false,"image":true,"giftName":true,"assetName":true}
 ```
+
+`giftName` and `assetName` are tracked separately because the component's name fallback has three levels — `giftName`, else `assetName`, else the literal `"Gift"` — and a row missing both renders differently from a row missing only `giftName`.
 
 This tells you, before opening the browser, exactly which of Step 6's combinations this video can exercise. Repeat B on other videos to cover the combinations the first one lacks — gifts without `image`, and gifts without `giftName`, are rarer than gifts without `amount`.
 
@@ -703,9 +716,10 @@ Write down, for each of the following, either a video ID or "not found in this d
 4. gift row with `amount` absent **and** `image` present
 5. gift row with `amount` present **and** `image` absent
 6. gift row with `amount` absent **and** `image` absent
-7. gift row with `giftName` absent (non-English locale)
+7. gift row with `giftName` absent but `assetName` present (non-English locale)
+8. gift row with **both** `giftName` and `assetName` absent
 
-Items 3–6 are the four-combination cross-product the spec's §8 verification calls for. A "not found" here is a legitimate outcome — real archives may simply contain no gift that lacks an image. It is **not** a reason to skip the rest, and it must be carried through to Step 8's report.
+Items 3–6 are the four-combination cross-product the spec's §8 verification calls for; items 7–8 cover the second and third levels of the name fallback. A "not found" here is a legitimate outcome — real archives may simply contain no gift that lacks an image, and item 8 in particular may never occur in practice. It is **not** a reason to skip the rest, and it must be carried through to Step 8's report.
 
 - [ ] **Step 5: Verify the chip**
 
@@ -722,7 +736,7 @@ On the item-1 video, click the `Gift` chip so it is the only one selected, then 
 - Only gift rows are listed.
 - The timestamp is a YouTube deep link for rows after `actualStart`.
 
-Then, for each of items 3–7 that you found, locate such a row and confirm its rendering:
+Then, for each of items 3–8 that you found, locate such a row and confirm its rendering:
 
 | Item | Row shape | Expected rendering |
 | --- | --- | --- |
@@ -730,9 +744,10 @@ Then, for each of items 3–7 that you found, locate such a row and confirm its 
 | 4 | no `amount`, `image` | image then name, **no** amount at all — no `N/A`, no `0 💎` |
 | 5 | `amount`, no `image` | amount then name, no broken-image icon, no empty gap |
 | 6 | no `amount`, no `image` | name alone on the row |
-| 7 | no `giftName` | name falls back to `assetName`, e.g. `finger_heart` |
+| 7 | no `giftName`, has `assetName` | name falls back to `assetName`, e.g. `finger_heart` |
+| 8 | no `giftName`, no `assetName` | name is the literal `Gift` |
 
-For any item recorded as "not found" in Step 4, mark its row here as not exercised — do not claim it rendered correctly.
+Rows for different items may live in different videos — switch videos as needed, the `Gift`-only selection carries over in the URL. For any item recorded as "not found" in Step 4, mark its row here as not exercised — do not claim it rendered correctly.
 
 Finally, scroll several screens of gift rows to exercise the virtualizer. Rows measure taller than the 64px estimate, so a layout bug shows up as jumping or overlap, not as an error in the console.
 
