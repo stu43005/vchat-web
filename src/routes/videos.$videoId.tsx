@@ -16,21 +16,10 @@ import { FilterChips } from "../components/FilterChips";
 import { ChatList } from "../components/ChatList";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
 import { useTimezonePref } from "../lib/settings";
-import type { FilterableType } from "../api/types";
+import { FILTERABLE_TYPES, type FilterableType } from "../api/types";
 import { LegacyArchiveAlert } from "../components/LegacyArchiveAlert";
 
-const filterableTypeEnum = z.enum([
-  "chat",
-  "superChat",
-  "superSticker",
-  "gift",
-  "membership",
-  "membershipGift",
-  "membershipGiftPurchase",
-  "milestone",
-  "poll",
-  "raid",
-]);
+const filterableTypeEnum = z.enum(FILTERABLE_TYPES);
 
 const videoSearchSchema = z.object({
   types: z.array(filterableTypeEnum).optional(),
