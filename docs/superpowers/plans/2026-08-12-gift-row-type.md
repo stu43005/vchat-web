@@ -29,7 +29,7 @@
 | `src/lib/format.ts` | Display formatting helpers | Modify (Task 1) |
 | `src/components/chat-rows/GiftRow.tsx` | Render one `gift` row | **Create** (Task 2) |
 | `src/components/chat-rows/RowDispatcher.tsx` | `type` → component switch | Modify (Task 2) |
-| `src/routes/videos.$videoId.tsx` | Route + search-param schema | Modify (Task 4) |
+| `src/routes/videos.$videoId.tsx` | Route + search-param schema | Modify (Tasks 2, 4) |
 | `src/components/FilterChips.tsx` | Chip list + significance slider | Modify (Tasks 5, 6) |
 | `src/components/VideoCard.tsx` | Video card footer stats | Modify (Task 7) |
 
@@ -75,13 +75,16 @@ git commit -m "feat(format): add formatJewels for the non-ISO JEWEL currency"
 
 ### Task 2: `gift` row type end to end (type → parser → component → dispatcher)
 
-These four files must land in one commit: adding `ChatRowGift` to the union makes `RowDispatcher`'s `never` branch fail typecheck, so splitting this task would commit a repo that does not compile. Steps 1–2 deliberately observe that failure before fixing it.
+These five files must land in one commit: adding `ChatRowGift` to the union makes `RowDispatcher`'s `never` branch fail typecheck, so splitting this task would commit a repo that does not compile. Steps 1–2 deliberately observe that failure before fixing it.
+
+Two of the five are compiler-forced, not optional. `RowDispatcher` is the obvious one. The second is easy to miss: `FilterableType` is *derived* from `ChatRow["type"]`, so widening the union also widens `FilterableType`, and the route's hand-written `filterableTypeEnum` — which does not list `"gift"` — stops typing the `types` search param widely enough to satisfy `FilterChips` / `ChatList`. Step 6 adds a **one-line stopgap** there; Task 4 deletes that whole literal and derives it from `FILTERABLE_TYPES`. The stopgap exists so that no commit in the history fails to compile — it is deliberate, temporary, and superseded two tasks later.
 
 **Files:**
 - Modify: `src/api/types.ts` (insert after `ChatRowSuperSticker`, currently lines 29-38; union at lines 94-104; `VideoAggregates` at lines 170-183)
 - Modify: `src/lib/jsonl.ts:4-17`
 - Create: `src/components/chat-rows/GiftRow.tsx`
 - Modify: `src/components/chat-rows/RowDispatcher.tsx`
+- Modify: `src/routes/videos.$videoId.tsx` (one-line stopgap in `filterableTypeEnum`; removed by Task 4)
 - Test: none — this repo has no test framework
 
 - [ ] **Step 1: Add `ChatRowGift` and wire it into the union in `src/api/types.ts`**
@@ -249,19 +252,43 @@ Add the case after `superSticker`, matching the union order:
       return <GiftRow row={row} no={no} video={video} timezone={timezone} />;
 ```
 
-- [ ] **Step 6: Run typecheck and lint, confirm both pass**
+- [ ] **Step 6: Add the one-line stopgap to the route's search-param enum**
+
+Widening `ChatRow` widened the derived `FilterableType`, so the route's hand-written `filterableTypeEnum` in `src/routes/videos.$videoId.tsx` now types `types` too narrowly and fails at the `FilterChips` / `ChatList` call sites with:
+
+```text
+src/routes/videos.$videoId.tsx(130,36): error TS2322: Type 'FilterableType[]' is not assignable to type '("chat" | "superChat" | ...)[]'.
+    Type '"gift"' is not assignable to type '"chat" | "superChat" | ...'.
+```
+
+Add `"gift"` in union position, and nothing else:
+
+```diff
+ const filterableTypeEnum = z.enum([
+   "chat",
+   "superChat",
+   "superSticker",
++  "gift",
+   "membership",
+   "membershipGift",
+   "membershipGiftPurchase",
+```
+
+Do **not** refactor this enum here. Task 4 replaces the whole literal with `z.enum(FILTERABLE_TYPES)`; this line is a deliberate stopgap that keeps every commit compilable in between.
+
+- [ ] **Step 7: Run typecheck and lint, confirm both pass**
 
 ```bash
 npm run typecheck
 npm run lint
 ```
 
-Expected: both exit 0. The `never` error from Step 2 is gone.
+Expected: both exit 0. The `never` error from Step 2 and the TS2322 from Step 6 are both gone.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
-git add src/api/types.ts src/lib/jsonl.ts src/components/chat-rows/GiftRow.tsx src/components/chat-rows/RowDispatcher.tsx
+git add src/api/types.ts src/lib/jsonl.ts src/components/chat-rows/GiftRow.tsx src/components/chat-rows/RowDispatcher.tsx "src/routes/videos.\$videoId.tsx"
 git commit -m "feat(chat-rows): parse and render the gift row type"
 ```
 
@@ -372,13 +399,14 @@ import { FILTERABLE_TYPES, type FilterableType } from "../api/types";
 
 - [ ] **Step 2: Replace the hand-written zod enum**
 
-Delete this whole block:
+Delete this whole block — including the `"gift"` stopgap Task 2 Step 6 added to it:
 
 ```ts
 const filterableTypeEnum = z.enum([
   "chat",
   "superChat",
   "superSticker",
+  "gift",
   "membership",
   "membershipGift",
   "membershipGiftPurchase",
