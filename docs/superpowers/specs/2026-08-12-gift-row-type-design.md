@@ -29,6 +29,9 @@ notions of "gift" are no longer ambiguous in the UI.
   Jewels gift.
 - Keep the change confined to the existing one-component-per-row-type
   pattern.
+- Make the filterable-row-type set a single typechecked source, so that
+  adding a row type cannot silently ship without a chip or without a
+  valid URL search param (§7.1).
 
 ## 3. Non-goals / Accepted limitations
 
@@ -49,12 +52,6 @@ notions of "gift" are no longer ambiguous in the UI.
   hundreds of gift rows (the contract doc's own example shows 143),
   which would swamp the SuperChat rows the default view exists to
   surface.
-- **No consolidation of the filterable-type list.** The set of
-  filterable row types is currently spelled out in three places
-  (`FilterableType` in `types.ts`, `filterableTypeEnum` in the video
-  route, `CHIPS` in `FilterChips.tsx`). Collapsing them to one source
-  is a worthwhile but separate change; doing it here would enlarge the
-  review surface of an otherwise additive change.
 - **No test framework.** The project has none (no `test` script, no
   vitest/jest). This change does not introduce one; see §8.
 - **No meta/JSONL count-consistency mechanism.** A review raised that an
@@ -134,8 +131,9 @@ export interface ChatRowGift extends AuthorFields {
 ```
 
 Add `ChatRowGift` to the `ChatRow` union in the same position.
-`FilterableType` is derived (`Exclude<ChatRow["type"], "raidOutgoing">`)
-and picks up `"gift"` with no edit.
+`FilterableType` keeps its current definition
+(`Exclude<ChatRow["type"], "raidOutgoing">`) and picks up `"gift"` with
+no edit; §7.1 adds the canonical tuple beside it.
 
 Add to `VideoAggregates`:
 
@@ -219,12 +217,17 @@ amount (monospace)   image (maxHeight 48)   name
     : "Gift";
   ```
 
-  `image` needs no guard: it is only ever an attribute value, which the
-  DOM coerces without throwing.
+  `image` gets a `typeof === "string"` check for a different reason: a
+  bad value there does not throw, it fires a bogus network request (see
+  the `image` bullet above).
 - **image** — `<Box component="img">` with `loading="lazy"` and
   `referrerPolicy="no-referrer"` (the assets are gstatic URLs; this
-  matches the project's external-image convention). Omitted entirely
-  when `row.image` is absent.
+  matches the project's external-image convention). Rendered only when
+  `typeof row.image === "string"`, so a non-string value coming through
+  the unvalidated cast cannot produce an `<img>` with a coerced
+  nonsense `src` (`"[object Object]"` would be requested as a relative
+  URL). Any other value is treated exactly like an absent one: no
+  `<img>` element at all.
 - **name** — the guarded `name` above (`giftName`, else `assetName`,
   else the literal `"Gift"`). The same string is the image's `alt` and
   `title`.
@@ -249,42 +252,128 @@ net.
 
 ## 7. Filtering and labels
 
-### 7.1 `src/routes/videos.$videoId.tsx`
+### 7.1 Single source for the filterable types (`src/api/types.ts`)
 
-Add `"gift"` to `filterableTypeEnum`. This zod enum validates the
-`types` search param, so without it `?types=["gift"]` would be rejected
-and the filter would be unreachable by URL.
+Today the filterable set is spelled out three times: `FilterableType`
+(derived), `filterableTypeEnum` (hand-written zod enum in the video
+route), and `CHIPS` (hand-written array in `FilterChips`). Only
+`RowDispatcher` is gated by the compiler, so a row type could ship
+parsed and rendered but with no chip and with `?types=["gift"]`
+rejected by zod — nothing would fail typecheck. Adding `gift` makes
+that the fourth hand-edit, so this change collapses the three lists to
+one typechecked source.
+
+Add beside the existing `FilterableType`:
+
+```ts
+export type FilterableType = Exclude<ChatRow["type"], "raidOutgoing">;
+
+// Canonical filterable row types, in chip / URL order. Single source
+// for the chip list and the route's search-param enum.
+export const FILTERABLE_TYPES = [
+  "chat",
+  "superChat",
+  "superSticker",
+  "gift",
+  "membership",
+  "membershipGift",
+  "membershipGiftPurchase",
+  "milestone",
+  "poll",
+  "raid",
+] as const satisfies readonly FilterableType[];
+
+// Fails typecheck if a filterable row type is missing from the tuple.
+// `satisfies` above rejects entries that are not filterable; this
+// rejects filterable types the tuple forgot.
+type AssertNever<_T extends never> = true;
+export type FilterableTypesAreExhaustive = AssertNever<
+  Exclude<FilterableType, (typeof FILTERABLE_TYPES)[number]>
+>;
+```
+
+The two checks are complementary and both are needed:
+
+- `satisfies readonly FilterableType[]` catches a typo or a
+  non-filterable entry (e.g. `"raidOutgoing"`).
+- `FilterableTypesAreExhaustive` catches an omission. If the tuple
+  lacks `"gift"`, the `Exclude` resolves to `"gift"`, which does not
+  satisfy `AssertNever`'s `extends never` constraint, and typecheck
+  fails with the missing member named in the error.
+
+`FilterableTypesAreExhaustive` is exported so it is not an unused local
+declaration under `@typescript-eslint/no-unused-vars`; it is a
+compile-time assertion with no runtime footprint.
+
+### 7.2 `src/routes/videos.$videoId.tsx`
+
+Delete the hand-written `filterableTypeEnum` literal list and derive it:
+
+```ts
+import { FILTERABLE_TYPES } from "../api/types";
+
+const filterableTypeEnum = z.enum(FILTERABLE_TYPES);
+```
+
+zod 4.4.3 (this repo's version) types `z.enum` as
+`<const T extends readonly string[]>(values: T, …) => ZodEnum<ToEnum<T[number]>>`
+(`node_modules/zod/v4/classic/schemas.d.ts:567`), so a readonly `as const`
+tuple is accepted and `z.infer` yields the literal union — verified
+against the installed type definitions. `z.array(...)` and `.optional()`
+compose over it without widening to `string`, so the surrounding
+`videoSearchSchema` is unchanged.
 
 `DEFAULT_TYPES` stays `["superChat", "superSticker"]` (§3).
 
-### 7.2 `src/components/FilterChips.tsx`
+### 7.3 `src/components/FilterChips.tsx`
 
-Insert one entry into `CHIPS`, after `superSticker` and before
-`membership`, grouping the paid-tip types together:
+Replace the `CHIPS` array with an exhaustive record keyed by
+`FilterableType`, and render by mapping `FILTERABLE_TYPES`:
 
 ```ts
-{ key: "gift", label: "Gift", count: (a) => (a.jewelGiftCount ?? 0).toLocaleString() },
+const CHIP_META: Record<FilterableType, {
+  label: string;
+  count: (agg: VideoAggregates) => string;
+}> = {
+  chat: { label: "Chat", count: (a) => a.chatCount.toLocaleString() },
+  // …one entry per filterable type…
+  gift: { label: "Gift", count: (a) => (a.jewelGiftCount ?? 0).toLocaleString() },
+  // …
+};
 ```
 
-`CHIPS` order also determines the order `toggle()` writes back into the
-URL's `types` array. Inserting mid-list changes that serialization for
-existing bookmarks, but both `ChatList` and `FilterChips` compare via
-`Set`, so order is cosmetic and no bookmark breaks.
+A `Record<FilterableType, …>` is exhaustive by construction: omitting
+`gift` is a compile error naming the missing key. Rendering maps
+`FILTERABLE_TYPES` so the order lives only in the tuple, and `toggle()`
+likewise rebuilds the selection with
+`FILTERABLE_TYPES.filter((t) => next.has(t))` instead of filtering the
+old array.
+
+Every chip is rendered unconditionally, exactly as today — the current
+code maps the whole list with no count-based filtering, so a chip whose
+count is `0` still appears (as `Chat (0)` does on an empty archive).
+The new `Gift (0)` on pre-r1 archives is therefore consistent with
+existing behavior, not a new case.
 
 `ChatList` needs no change: the significance range is applied only in
 the `superChat` / `superSticker` branch, and `gift` has no
 `significance`.
 
-### 7.3 Label renames
+Placing `gift` mid-tuple also changes the order `toggle()` serializes
+into the URL's `types` array. Both `ChatList` and `FilterChips` compare
+via `Set`, so the order is cosmetic and existing bookmarks keep
+working.
+
+### 7.4 Label renames
 
 Three surfaces currently say "gift" while meaning **membership** gift.
 Rename them so the new type is unambiguous:
 
 | Location | Current | New |
 | --- | --- | --- |
-| `FilterChips` → `membershipGift` label | `Gifts Received` | `Membership Gifts Received` |
-| `FilterChips` → `membershipGiftPurchase` label | `Gift Purchases` | `Membership Gift Purchases` |
-| `FilterChips` → `membershipGiftPurchase` count | `…, N gifts` | `…, N membership gifts` |
+| `CHIP_META.membershipGift.label` | `Gifts Received` | `Membership Gifts Received` |
+| `CHIP_META.membershipGiftPurchase.label` | `Gift Purchases` | `Membership Gift Purchases` |
+| `CHIP_META.membershipGiftPurchase.count` | `…, N gifts` | `…, N membership gifts` |
 | `VideoCard` → `StatItem` | `Gifts` | `Membership Gifts` |
 
 `VideoCard` reads `video.stats.giftCount`, and `stats` gained no Jewels
@@ -296,8 +385,9 @@ No Jewels stat is added to the card.
 Edge cases:
 
 - **Pre-r1 archives** (v1 legacy and v2 r0) — `jewelGiftCount` is
-  absent, the chip reads `Gift (0)`, matching how every other chip
-  renders a zero count on an empty archive.
+  absent, so the chip reads `Gift (0)`. Chips are never hidden by their
+  count (§7.3), so this matches how every other chip renders a zero on
+  an archive with none of that row type.
 - **`amount: 0`** — renders `0 💎`, visibly distinct from an absent
   amount (which renders nothing).
 - **All optional fields absent** — a row with no `giftName`,
@@ -312,8 +402,13 @@ Edge cases:
 
 Verification:
 
-- `npm run typecheck` and `npm run lint` must pass. The `never` branch
-  in `RowDispatcher` makes typecheck a real gate on completeness here.
+- `npm run typecheck` and `npm run lint` must pass. Typecheck is a real
+  completeness gate for this change on three fronts: the `never` branch
+  in `RowDispatcher` (row must be rendered), the `Record<FilterableType, …>`
+  in `CHIP_META` (row must have a chip), and
+  `FilterableTypesAreExhaustive` (row must be in the tuple that feeds
+  the URL enum). Omitting any of the three fails the build rather than
+  shipping a half-wired row type.
 - Manual check against a dev server pointed at a data source with gift
   rows: confirm the four degradation combinations (amount present or
   absent × image present or absent), the chip count matching
