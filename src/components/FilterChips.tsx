@@ -1,27 +1,38 @@
 import { Box, Chip, Slider, Stack, Typography } from "@mui/material";
-import type { FilterableType, VideoAggregates } from "../api/types";
+import {
+  FILTERABLE_TYPES,
+  type FilterableType,
+  type VideoAggregates,
+} from "../api/types";
 import { warnOnce } from "../lib/warn";
 
-const CHIPS: Array<{
-  key: FilterableType;
-  label: string;
-  count: (agg: VideoAggregates) => string;
-}> = [
-  { key: "chat", label: "Chat", count: (a) => a.chatCount.toLocaleString() },
-  { key: "superChat", label: "SuperChat", count: (a) => a.superChatCount.toLocaleString() },
-  { key: "superSticker", label: "SuperSticker", count: (a) => a.superStickerCount.toLocaleString() },
-  { key: "membership", label: "Member", count: (a) => a.membershipCount.toLocaleString() },
-  { key: "membershipGift", label: "Gifts Received", count: (a) => a.giftCount.toLocaleString() },
-  {
-    key: "membershipGiftPurchase",
+// Keyed by FilterableType, so the compiler names any row type missing a chip.
+// Display order lives in FILTERABLE_TYPES, not here.
+const CHIP_META: Record<
+  FilterableType,
+  { label: string; count: (agg: VideoAggregates) => string }
+> = {
+  chat: { label: "Chat", count: (a) => a.chatCount.toLocaleString() },
+  superChat: { label: "SuperChat", count: (a) => a.superChatCount.toLocaleString() },
+  superSticker: {
+    label: "SuperSticker",
+    count: (a) => a.superStickerCount.toLocaleString(),
+  },
+  gift: { label: "Gift", count: (a) => (a.jewelGiftCount ?? 0).toLocaleString() },
+  membership: { label: "Member", count: (a) => a.membershipCount.toLocaleString() },
+  membershipGift: {
+    label: "Gifts Received",
+    count: (a) => a.giftCount.toLocaleString(),
+  },
+  membershipGiftPurchase: {
     label: "Gift Purchases",
     count: (a) =>
       `${a.giftPurchaseCount.toLocaleString()}, ${a.totalGiftAmount.toLocaleString()} gifts`,
   },
-  { key: "milestone", label: "Milestone", count: (a) => a.milestoneCount.toLocaleString() },
-  { key: "poll", label: "Poll", count: (a) => a.pollCount.toLocaleString() },
-  { key: "raid", label: "Raid", count: (a) => a.raidCount.toLocaleString() },
-];
+  milestone: { label: "Milestone", count: (a) => a.milestoneCount.toLocaleString() },
+  poll: { label: "Poll", count: (a) => a.pollCount.toLocaleString() },
+  raid: { label: "Raid", count: (a) => a.raidCount.toLocaleString() },
+};
 
 interface FilterChipsProps {
   aggregates: VideoAggregates;
@@ -39,22 +50,25 @@ export function FilterChips(props: FilterChipsProps) {
     const next = new Set(selected);
     if (next.has(key)) next.delete(key);
     else next.add(key);
-    onTypesChange(CHIPS.filter((c) => next.has(c.key)).map((c) => c.key));
+    onTypesChange(FILTERABLE_TYPES.filter((t) => next.has(t)));
   };
 
   return (
     <Box sx={{ my: 2 }}>
       <Stack direction="row" useFlexGap sx={{ flexWrap: "wrap", gap: 1 }}>
-        {CHIPS.map((chip) => (
-          <Chip
-            key={chip.key}
-            label={`${chip.label} (${chip.count(aggregates)})`}
-            color={selected.has(chip.key) ? "primary" : "default"}
-            variant={selected.has(chip.key) ? "filled" : "outlined"}
-            onClick={() => toggle(chip.key)}
-            clickable
-          />
-        ))}
+        {FILTERABLE_TYPES.map((key) => {
+          const meta = CHIP_META[key];
+          return (
+            <Chip
+              key={key}
+              label={`${meta.label} (${meta.count(aggregates)})`}
+              color={selected.has(key) ? "primary" : "default"}
+              variant={selected.has(key) ? "filled" : "outlined"}
+              onClick={() => toggle(key)}
+              clickable
+            />
+          );
+        })}
       </Stack>
       <Box sx={{ mt: 3, maxWidth: 480 }}>
         <Typography variant="caption" color="text.secondary">
