@@ -79,6 +79,14 @@ export function formatSuperAmount(row: {
     : `${formatCurrency(row.amount, row.currency)} (${formatCurrency(row.jpyAmount, "JPY")})`;
 }
 
+// YouTube Gifts are priced in Jewels, whose `currency` code is the literal
+// "JEWEL". That is not a 3-letter ISO 4217 code, so formatCurrency (which
+// calls Intl with style: "currency") throws RangeError on it. Format the
+// bare number and append the gem glyph instead.
+export function formatJewels(amount: number): string {
+  return `${amount.toLocaleString("en-US")} 💎`;
+}
+
 // JST calendar date as "YYYY-MM-DD" from an ISO instant. (ymdInTokyo above
 // returns "YYYYMMDD" without dashes and is kept for the legacy redirect path.)
 export function ymdDashInTokyo(iso: string): string {
