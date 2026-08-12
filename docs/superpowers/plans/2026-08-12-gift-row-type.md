@@ -335,13 +335,15 @@ export const FILTERABLE_TYPES = [
 //   The assertion below rejects a filterable row type the tuple FORGOT: the
 //   Exclude resolves to the missing member, which fails `extends never`, and
 //   tsc names it in the error.
-type AssertNever<_T extends never> = true;
+type AssertNever<T extends never> = T;
 export type FilterableTypesAreExhaustive = AssertNever<
   Exclude<FilterableType, (typeof FILTERABLE_TYPES)[number]>
 >;
 ```
 
-`FilterableTypesAreExhaustive` is exported so it is not an unused local declaration under `@typescript-eslint/no-unused-vars`. It has no runtime footprint — it is a type alias.
+The constraint `T extends never` is what does the work; the alias body just has to *use* `T`. Do not write the parameter as `_T` and discard it — `@typescript-eslint/no-unused-vars` flags an unused type parameter even when underscore-prefixed, and this repo's `eslint.config.js` sets no `varsIgnorePattern` override, so `npm run lint` fails with `'_T' is defined but never used`.
+
+`FilterableTypesAreExhaustive` is exported so it is not an unused local declaration under the same rule. It has no runtime footprint — it is a type alias.
 
 - [ ] **Step 2: Prove the exhaustiveness guard actually fires**
 
