@@ -661,36 +661,87 @@ Ensure `VITE_DATA_PROXY` is set in `.env.local`, then:
 npm run dev
 ```
 
-Open the printed URL and navigate to a video whose `meta.json` has `aggregates.jewelGiftCount > 0`.
+Leave `npm run dev` running (it prints a URL, by default `http://localhost:5173`). The dev server proxies `/data/*`, so the raw archive files can be inspected through it with `curl` — that is how Step 4 picks its test subjects.
 
-If no such data source is reachable, **stop and report that Steps 4–6 could not be run** — do not mark them done and do not claim the manual pass happened.
+If `VITE_DATA_PROXY` is unset or the proxied deployment is unreachable, **stop here and report that Steps 4–7 could not be run.** Do not mark them done and do not describe UI you did not see.
 
-- [ ] **Step 4: Verify the chip**
+- [ ] **Step 4: Find the specific videos each later step needs**
 
-On the video page, confirm:
+Do not go hunting in the UI. Query the proxied archive directly and record the video IDs. `jq` reads JSONL line by line, so these work unmodified. If `jq` is not installed, install it (`brew install jq`) — the fallback of eyeballing raw JSONL is error-prone.
+
+Pick a candidate video ID from the index page, then classify it:
+
+```bash
+# A: does this video have gift rows at all, and how many?
+curl -s "http://localhost:5173/data/videos/<videoId>.meta.json" \
+  | jq '.aggregates.jewelGiftCount'
+```
+
+Expected for an r1 archive with gifts: a number `> 0`. `null` means the field is absent — that video is a **pre-r1 archive**, which is exactly what one Step 5 bullet needs. Record one ID of each kind.
+
+```bash
+# B: which gift-row shapes does this video actually contain?
+curl -s "http://localhost:5173/data/videos/<videoId>.jsonl" \
+  | jq -c 'select(.type=="gift") | {amount: (.amount != null), image: (.image != null), giftName: (.giftName != null)}' \
+  | sort | uniq -c
+```
+
+Expected: a small table such as:
+
+```text
+  118 {"amount":true,"image":true,"giftName":true}
+   25 {"amount":false,"image":true,"giftName":true}
+```
+
+This tells you, before opening the browser, exactly which of Step 6's combinations this video can exercise. Repeat B on other videos to cover the combinations the first one lacks — gifts without `image`, and gifts without `giftName`, are rarer than gifts without `amount`.
+
+Write down, for each of the following, either a video ID or "not found in this data source":
+
+1. r1 archive with `jewelGiftCount > 0`
+2. pre-r1 archive (`jewelGiftCount` is `null`)
+3. gift row with `amount` present **and** `image` present
+4. gift row with `amount` absent **and** `image` present
+5. gift row with `amount` present **and** `image` absent
+6. gift row with `amount` absent **and** `image` absent
+7. gift row with `giftName` absent (non-English locale)
+
+Items 3–6 are the four-combination cross-product the spec's §8 verification calls for. A "not found" here is a legitimate outcome — real archives may simply contain no gift that lacks an image. It is **not** a reason to skip the rest, and it must be carried through to Step 8's report.
+
+- [ ] **Step 5: Verify the chip**
+
+Open the video from item 1 in the browser and confirm:
 - A `Gift (N)` chip appears between `SuperSticker` and `Member`.
-- `N` equals that video's `aggregates.jewelGiftCount`.
+- `N` equals the `jewelGiftCount` printed by query A.
 - The chip is **not** selected on arrival (the default is SuperChat + SuperSticker).
-- On a pre-r1 video (no `jewelGiftCount` in its meta), the chip reads `Gift (0)` rather than disappearing.
 
-- [ ] **Step 5: Verify row rendering and the degradation paths**
+Then open the video from item 2 and confirm the chip reads `Gift (0)` rather than disappearing. If item 2 was "not found", record that this bullet was not exercised and move on.
 
-Click the `Gift` chip alone and confirm:
+- [ ] **Step 6: Verify row rendering and every degradation combination**
+
+On the item-1 video, click the `Gift` chip so it is the only one selected, then confirm:
 - Only gift rows are listed.
-- A row with a price shows e.g. `10 💎` in monospace, then the gift image, then the name.
-- A row whose `amount` is absent shows no amount at all — no `N/A`, no `0 💎`.
-- A row whose `image` is absent shows the name with no broken-image icon.
-- A row outside the English locale (no `giftName`) falls back to the `assetName`, e.g. `finger_heart`.
 - The timestamp is a YouTube deep link for rows after `actualStart`.
 
-Scroll several screens of gift rows to exercise the virtualizer — measured heights differ from the 64px estimate and a layout bug shows up as jumping, not as an error.
+Then, for each of items 3–7 that you found, locate such a row and confirm its rendering:
 
-- [ ] **Step 6: Verify the URL round-trip and the renamed labels**
+| Item | Row shape | Expected rendering |
+| --- | --- | --- |
+| 3 | `amount` + `image` | `10 💎` in monospace, then the image, then the name |
+| 4 | no `amount`, `image` | image then name, **no** amount at all — no `N/A`, no `0 💎` |
+| 5 | `amount`, no `image` | amount then name, no broken-image icon, no empty gap |
+| 6 | no `amount`, no `image` | name alone on the row |
+| 7 | no `giftName` | name falls back to `assetName`, e.g. `finger_heart` |
+
+For any item recorded as "not found" in Step 4, mark its row here as not exercised — do not claim it rendered correctly.
+
+Finally, scroll several screens of gift rows to exercise the virtualizer. Rows measure taller than the 64px estimate, so a layout bug shows up as jumping or overlap, not as an error in the console.
+
+- [ ] **Step 7: Verify the URL round-trip and the renamed labels**
 
 - With only `Gift` selected, the address bar carries `types=["gift"]`; reload the page and confirm the selection survives (this is what Task 4's zod enum gates — before it, the reload would drop the param).
 - Confirm the chips now read `Membership Gifts Received` and `Membership Gift Purchases`, and that the purchase count ends in `… membership gifts`.
 - Navigate to the index or a channel page and confirm the video-card footer stat reads `Membership Gifts`.
 
-- [ ] **Step 7: Report**
+- [ ] **Step 8: Report**
 
-State plainly which of Steps 4–6 were actually executed and what was observed. If a data source with gift rows was unavailable, say so — an unverified manual pass must not be reported as done.
+Report the automated results (Steps 1–2) and then, bullet by bullet, which manual checks were actually exercised and what was observed. Every item Step 4 recorded as "not found in this data source" must appear in the report as **not exercised**, naming the combination that went unverified. An unverified check must never be reported as passing.
